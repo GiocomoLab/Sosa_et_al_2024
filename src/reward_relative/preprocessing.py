@@ -427,7 +427,7 @@ def dff(f,
 
         if baseline_method == 'maximin':
             flow[:, start - 1:stop -
-                 1] = ut.nansmooth(f_[:, start-1:stop-1], [0, 15])
+                 1] = nansmooth(f_[:, start-1:stop-1], [0, 15])
             # [0., 30])  # cut out ITIs and smooth signal
             # minimum filter, taking min val over 20 sec
             flow[:, start-1:stop-1] = sp.ndimage.filters.minimum_filter1d(
@@ -436,7 +436,7 @@ def dff(f,
                 flow[:, start-1:stop-1], int(300), axis=-1)  # max filter with same window (dilation)
         elif baseline_method == 'maxsmooth':
             flow[:, start-1:stop -
-                 1] = ut.nansmooth(f_[:, start-1:stop-1], [0, stop-start])
+                 1] = nansmooth(f_[:, start-1:stop-1], [0, stop-start])
         else:
             print('Undefined baseline_method')
             raise NotImplementedError
