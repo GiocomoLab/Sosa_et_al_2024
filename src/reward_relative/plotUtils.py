@@ -1,3 +1,4 @@
+import statsmodels.formula.api as smf
 from scipy.stats.qmc import Halton
 from scipy.stats import gaussian_kde
 from seaborn._core.typing import Default
@@ -68,8 +69,8 @@ def set_fig_params(fontsize=14):
     mpl.rcParams["ytick.minor.width"] = 0.5
     mpl.rcParams['xtick.color'] = 'black'
     mpl.rcParams['ytick.color'] = 'black'
-    mpl.rcParams['axes.edgecolor']= 'black'
-    mpl.rcParams['axes.labelcolor'] ='black'
+    mpl.rcParams['axes.edgecolor'] = 'black'
+    mpl.rcParams['axes.labelcolor'] = 'black'
     mpl.rcParams['text.color'] = 'black'
 
 
@@ -95,11 +96,11 @@ def convert_pvalue_to_asterisks(pvalue, p_thr=0.05):
         return "ns"
 
 
-def plot_mean_sem(ax, 
-                  mean, 
-                  sem, 
+def plot_mean_sem(ax,
+                  mean,
+                  sem,
                   xvalues=None,
-                  color='k', 
+                  color='k',
                   sem_alpha=0.3,
                   **kwargs):
     """
@@ -164,7 +165,7 @@ def plot_mean_2std(ax, data, axis=0, xvalues=None, color='k', **kwargs):
     return
 
 
-def plot_lin_reg(x, y, ax, color = 'grey'):
+def plot_lin_reg(x, y, ax, color='grey'):
     slope, intercept, line, reg_params = regression.linear_reg(np.array(x).astype(float),
                                                                np.array(y).astype(float))
     h = plot_mean_sem(ax, line['y'], line['std'], xvalues=line['x'],
@@ -174,60 +175,60 @@ def plot_lin_reg(x, y, ax, color = 'grey'):
                                                                              slope,
                                                                              reg_params['p'])))
     ax.legend()
-    
+
     return reg_params
 
 
-import statsmodels.formula.api as smf
-def lmm_plot(x, 
-             y, 
-             data_df, 
-             subject='mouse', 
-             ax=None, 
-             legend_on=False, 
-             hue='mouse', 
-             palette='tab10', 
-             logit_expit=False, 
-             verbose=False, 
-             reml=True, 
+def lmm_plot(x,
+             y,
+             data_df,
+             subject='mouse',
+             ax=None,
+             legend_on=False,
+             hue='mouse',
+             palette='tab10',
+             logit_expit=False,
+             verbose=False,
+             reml=True,
              markers='',
-            **kwargs):
+             **kwargs):
     """
     x, y should be a string identifying the independent, dependent variable column in data_df
     data_df should be the pandas Dataframe of data
     """
     if ax is None:
-        fig, ax = plt.subplots(figsize=(4,4))
-        
+        fig, ax = plt.subplots(figsize=(4, 4))
+
     sns.stripplot(x=x, y=y, hue=subject, data=data_df, ax=ax, legend=legend_on,
-                 palette=palette, alpha=0.6)
+                  palette=palette, alpha=0.6)
     df_copy = data_df.copy()
     if logit_expit:
         df_copy[y] = sp.special.logit(ut.avoid_naninf(df_copy[y]))
     if legend_on:
-        ax.legend(bbox_to_anchor=(1.2,1))
-    lmm = smf.mixedlm(y + ' ~ 1 + ' + x, groups=subject, re_formula = '~1', 
-                         data=df_copy, missing='drop').fit(reml=reml)
+        ax.legend(bbox_to_anchor=(1.2, 1))
+    lmm = smf.mixedlm(y + ' ~ 1 + ' + x, groups=subject, re_formula='~1',
+                      data=df_copy, missing='drop').fit(reml=reml)
     if verbose:
         print(lmm.summary())
     ax.set_title("coef = %.3f, p = %.2e, conv=%s" % (
-    lmm.fe_params[x], lmm.pvalues[x], str(lmm.converged)), fontsize=10)
+        lmm.fe_params[x], lmm.pvalues[x], str(lmm.converged)), fontsize=10)
     df_copy['predict'] = lmm.predict(df_copy)
     if logit_expit:
         df_copy['predict'] = sp.special.expit(df_copy['predict'])
-    sns.pointplot(x=x, y='predict', data=df_copy, ax=ax, color='grey', markers=markers, **kwargs)
+    sns.pointplot(x=x, y='predict', data=df_copy, ax=ax,
+                  color='grey', markers=markers, **kwargs)
     ax.set_ylabel(y)
-    
 
-def plot_stacked_traces(ax, 
-                        data, 
+
+def plot_stacked_traces(ax,
+                        data,
                         xvalues=None,
-                          cmap='viridis',
+                        cmap='viridis',
                         cmap_low=0,
                         cmap_high=1,
-                        norm=False, 
+                        norm=False,
                         inverty=False,
-                          **kwargs):
+                        **kwargs):
     """
     Plot a matrix of traces with each trace stacked in index order like a raster
 
@@ -267,12 +268,11 @@ def plot_stacked_traces(ax,
             else:
                 j = np.copy(i)
             ax.plot(xvals, j + trace, color=colors[i, :], **kwargs)
-            
+
     if inverty:
-        yticks = np.arange(0,data.shape[0]+10,10)
+        yticks = np.arange(0, data.shape[0]+10, 10)
         ax.set_yticks(yticks)
         ax.set_yticklabels(np.flip(yticks))
-
 
     return
 
@@ -322,7 +322,6 @@ def colorbar(mappable, **kwargs):
     return cbar
 
 
-
 def histogram(data, ax=None, bins=10, bin_range=None, plot=True, **kwargs):
     """
     Create and plot a pdf (probability density function)
@@ -361,7 +360,9 @@ def color_def(experiment=None, exp_day=None, rz_label0='A', rz_label1=None, expa
 
     cmap0, cmap1 = [], []
 
+
     if (experiment == 'MetaLearn') or (experiment is None):
+
         if rz_label0 == 'A':
             cmap0 = (0.15, 0.46, 0.72, 1)
         elif rz_label0 == 'B':
@@ -384,17 +385,18 @@ def color_def(experiment=None, exp_day=None, rz_label0='A', rz_label1=None, expa
 
 
 def ct_palette(cat_list):
-    
+
     palette = {'RR': 'orange',
                'TR': 'black',
                'nonRR': 'grey',
                'appear': 'brown'
-              }
-    
+               }
+
     get_palette = {}
     [get_palette.update({cat: palette[cat]})for cat in cat_list]
-    
+
     return get_palette
+
 
 def get_anim_colors(n_anim):
 
@@ -405,21 +407,23 @@ def get_anim_colors(n_anim):
 
     return rgb_tuples
 
+
 def make_cmap_from_palette(n_colors, palette='viridis'):
-    
+
     seaborn_palette = sns.color_palette(
         palette, n_colors)  # , as_cmap=True)
     rgb_tuples = [sns.color_palette(seaborn_palette)[i]
                   for i in range(len(seaborn_palette))]
     cmap = np.asarray(rgb_tuples)
-    
+
     return cmap
 
+
 def make_cmap_from_cm(n_colors, cmap='viridis', cmap_low=0, cmap_high=1):
-    
+
     make_cmap = cm.get_cmap(cmap)
     colors = make_cmap(np.linspace(cmap_low, cmap_high, n_colors))
-    
+
     return colors
 
 
@@ -436,5 +440,4 @@ def get_anim_day_colors(an_index, n_days):
                   for i in range(len(seaborn_palette))]
 
     return rgb_tuples
-
 

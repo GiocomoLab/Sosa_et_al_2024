@@ -9,6 +9,7 @@ import scipy as sp
 import pandas as pd
 import copy
 from sklearn.impute import KNNImputer
+
 from . import utilities as ut
 from . import behavior as behav
 from . import spatial
@@ -25,15 +26,16 @@ from tqdm import tqdm
 
 def define_anim_list(experiment, exp_day, year=2023):
 
+
     if experiment == 'MetaLearn':
 
         if year==2023:
             if exp_day in [1, 2]:
-                an_list = ['GCAMP2', 'GCAMP3', 'GCAMP4', 'GCAMP5',
+                an_list = ['GCAMP2', 'GCAMP3', 'GCAMP4',
                            'GCAMP6', 'GCAMP7',
                            'GCAMP10', 'GCAMP12', 'GCAMP13', 'GCAMP14']
             elif exp_day == 3:
-                an_list = ['GCAMP2', 'GCAMP3', 'GCAMP4', 'GCAMP5',
+                an_list = ['GCAMP2', 'GCAMP3', 'GCAMP4',
                            'GCAMP6', 'GCAMP7',
                            'GCAMP10', 'GCAMP11', 'GCAMP12', 'GCAMP13', 'GCAMP14']
 
@@ -44,16 +46,19 @@ def define_anim_list(experiment, exp_day, year=2023):
                 an_list = ['GCAMP10', 'GCAMP11', 'GCAMP12', 'GCAMP13', 'GCAMP14']
             else:
                 raise NotImplementedError("Animal list not defined for this day")
+        
         elif year==2024:
             an_list = ['GCAMP15', 'GCAMP17', 'GCAMP18', 'GCAMP19']
+        
         elif year=='combined':
             if exp_day in [1, 2]:
-                an_list = ['GCAMP2', 'GCAMP3', 'GCAMP4', 'GCAMP5',
+                an_list = ['GCAMP2', 'GCAMP3', 'GCAMP4',
                            'GCAMP6', 'GCAMP7',
                            'GCAMP10', 'GCAMP12', 'GCAMP13', 'GCAMP14',
                            'GCAMP15', 'GCAMP17', 'GCAMP18', 'GCAMP19']
+
             elif exp_day == 3:
-                an_list = ['GCAMP2', 'GCAMP3', 'GCAMP4', 'GCAMP5',
+                an_list = ['GCAMP2', 'GCAMP3', 'GCAMP4', 
                            'GCAMP6', 'GCAMP7',
                            'GCAMP10', 'GCAMP11', 'GCAMP12', 'GCAMP13', 'GCAMP14',
                            'GCAMP15', 'GCAMP17', 'GCAMP18', 'GCAMP19']
@@ -85,6 +90,7 @@ def max_anim_list(experiment, exp_days, year=2023):
 def define_block_by(experiment, exp_day, an):
 
     if experiment == 'MetaLearn':
+
         if an in ['GCAMP2', 'GCAMP6', 'GCAMP10']:
             def_block_by = None
         else:
@@ -1143,9 +1149,10 @@ class dayData:
         print(self.anim_list)
 
         include_ans = np.asarray(self.anim_list)[is_reward_switch]
-        # leaving this in for now to ensure these animals don't get included
+        # leaving this in for now to ensure these animals don't get included as "switch"
         include_ans = include_ans[~np.isin(
             include_ans, ['GCAMP2', 'GCAMP5', 'GCAMP6', 'GCAMP10'])]
+
 
         n_place_cells = np.sum(
             [np.sum(self.overall_place_cell_masks[an]) for an in include_ans])
@@ -1164,6 +1171,8 @@ class dayData:
                                    exclude_reward_cells=False,
                                    exclude_end_cells=False,
                                    use_and_cells=False,
+                                   reward_dist_exclusive=None,
+                                   dist_metric='circular', # 'linear' or 'circular'; only used if reward_dist_exclusive != None
                                    ):
         """
         Filter place cell IDs to remove putative track-relative, putative reward, and/or end cells posthoc
@@ -1200,13 +1209,45 @@ class dayData:
                    
             # here we're selecting which cells to exclude from place_cell_ids
             if exclude_track_cells:
-                track_cell_ids = np.where(self.is_track_cell[an])[0]
+
+                # first check attribute names
+                if hasattr(self, 'is_stable_cell'):
+                    track_cell_ids = np.where(self.is_stable_cell[an])[0]
+                elif hasattr(self, 'is_track_cell'):
+                    track_cell_ids = np.where(self.is_track_cell[an])[0]
+                else:
+                    raise NotImplementedError("Missing attribute to identify stable track cells")
+
                 not_track = ~np.isin(place_cell_ids, track_cell_ids)
                 bool_to_include[an] = np.multiply(
                     bool_to_include[an], not_track)
 
             if exclude_reward_cells:
-                reward_cell_ids = np.where(self.is_reward_cell[an])[0]
+
+                if reward_dist_exclusive is None:
+                    # use the originally defined reward_dist_exclusive
+                    reward_cell_ids = np.where(self.is_reward_cell[an])[0]
+                else:
+                    # redefine cells to exclude
+                    if dist_metric=='linear':
+                        is_reward_cell = spatial.find_reward_cells(self.peaks[an]['set 0'],
+                                                     self.peaks[an]['set 1'],
+                                                     self.rzone_pos[an]['set 0'][0],
+                                                     self.rzone_pos[an]['set 1'][0],
+                                                     reward_dist=reward_dist_exclusive)
+                    elif dist_metric == 'circular':
+                    
+                        # use circular distance from reward
+                        circ_thresh = spatial.dist_cm_to_rad(reward_dist_exclusive, max_pos=450, min_pos=0)
+                        # is_reward_cell = np.logical_and(
+                        is_reward_cell = np.logical_and(
+                            circ.phase_diff(spatial.dist_cm_to_rad(self.peaks[an]['set 0'], 450,0),
+                                            spatial.dist_cm_to_rad(self.rzone_pos[an]['set 0'][0], 450, 0)) <= circ_thresh,
+                            circ.phase_diff(spatial.dist_cm_to_rad(self.peaks[an]['set 1'], 450,0),
+                                            spatial.dist_cm_to_rad(self.rzone_pos[an]['set 1'][0], 450, 0)) <= circ_thresh,
+                        )
+                    reward_cell_ids = np.where(is_reward_cell)[0]
+  
                 not_near_reward = ~np.isin(place_cell_ids, reward_cell_ids)
                 bool_to_include[an] = np.multiply(
                     bool_to_include[an], not_near_reward)
@@ -1223,6 +1264,20 @@ class dayData:
     
     
 ### Functions outside of class:
+
+def get_rel_peaks_of_cell_ids(ids, overall_place_cell_masks, rel_peaks):
+    # ind in list of place cell inds (and rel peaks) matching this celltype
+    ind = ut.lookup_ind_exact(ids,
+                              np.where(overall_place_cell_masks)[0])
+    # get rid of nans first
+    ind = ind[~np.isnan(ind)].astype(int)
+
+    # get the position of each cell in the sequence relative to reward
+    rel_peaks_out = {}
+    rel_peaks_out['set 0'] = rel_peaks['set 0'][ind]
+    rel_peaks_out['set 1'] = rel_peaks['set 1'][ind]
+    
+    return rel_peaks_out
 
 def find_common_anim(multiDayData, day_list=None):
     # find which animals are common to all days
@@ -1449,13 +1504,7 @@ def dayData_to_df(multiDayData, columns, anim_list=None, manual_dict = None):
                         env = int(0)
                     else:
                         env = int(1)
-            elif experiment == 'NeuroMods':
-                if day < 10:
-                    env = int(0)
-                elif day in [10, 12, 14]:
-                    env = int(1)
-                elif day in [15, 17]:
-                    env = int(2)
+            
             else:
                 env = np.nan
 
@@ -1494,7 +1543,11 @@ def plot_rew_rel_hist_across_an(multiDayData,
                                 max_pos=450,
                                 min_pos=0,
                                 return_frac_above_shuf=False,
-                               return_dist_along_unity=False):
+                                return_dist_along_unity=False,
+                                reward_dist_exclusive=None,
+                                **kwargs # histogram plotting kwargs
+                                ):
+    
     """
     Plot histogram of distance between reward-relative peaks, compared to shuffle.
     Also calculates the fraction above shuffle (with specified cell types excluded
@@ -1547,6 +1600,7 @@ def plot_rew_rel_hist_across_an(multiDayData,
             exclude_reward_cells=exclude_reward_cells,
             exclude_end_cells=exclude_end_cells,
             use_and_cells=use_and_cells,
+            reward_dist_exclusive=reward_dist_exclusive,
         )
 
         for an in include_ans:
@@ -1585,6 +1639,13 @@ def plot_rew_rel_hist_across_an(multiDayData,
         frac_above_shuf[day] = use_frac_above_shuf
 
         ax1[d_i, 0].set_title("day %d, switch %d" % (day, d_i), fontsize=10)
+        if exclude_reward_cells:
+            ax1[d_i, 0].set_title("day %d, switch %d, exc reward %d" % (
+                day, d_i, reward_dist_exclusive), fontsize=10)
+        else:
+            ax1[d_i, 0].set_title("day %d, switch %d" % (day, d_i), fontsize=10)
+            
+
         ax1[d_i, 0].plot(bin_centers,
                          np.nanmean(use_hist_rel_dist_null,
                                     axis=0), linewidth=2, color='r')
@@ -1594,13 +1655,33 @@ def plot_rew_rel_hist_across_an(multiDayData,
                                        axis=0), '--', color='r')
 
         hist_rel, _ = pt.histogram(use_rel_dist,
-                                   ax=ax1[d_i, 0], bins=bin_edges, plot=True, facecolor='black',
-                                   edgecolor='black',
+                                   ax=ax1[d_i, 0], 
+                                   bins=bin_edges, 
+                                   plot=True, 
+                                   facecolor='black',
+                                   edgecolor='none',
                                    label="n=%d" % (
                                        len(
                                            use_rel_dist),  
+                                   ),
+                                   **kwargs
                                    )
-                                   )
+
+        # if 'facecolor' in kwargs.keys():
+        #     fc = kwargs['facecolor']
+        # else:
+        #     fc = 'black'
+        # if 'facecolor' in kwargs.keys():
+        #     fc = kwargs['facecolor']
+        # else:
+        #     fc = 'black'
+            
+        # hist_rel, _ = pt.histogram(use_rel_dist,
+        #                            ax=ax1[d_i, 0], 
+        #                            bins=bin_edges, 
+        #                            plot=True, 
+        #                            histtype='stepfilled',
+        #                            facecolor='none',
         
         ## Write histogram to the class, with params:
         multiDayData[day].circ_rel_stats_across_an['hist_dist_btwn_rel_peaks'] = hist_data
@@ -1613,11 +1694,11 @@ def plot_rew_rel_hist_across_an(multiDayData,
                                                           })
                                                                            
 
-        ax1[d_i, 0].set_xlabel('dist. between rel. peaks (rad)')
+        ax1[d_i, 0].set_xlabel('diff. between rel. peaks (rad)')
         ax1[d_i, 0].set_ylabel('fraction of cells')
         ax1[d_i, 0].legend()
 
-        ax1[d_i, 1].fill_betweenx([0, 0.05], [0, 0], [rzone, rzone],
+        ax1[d_i, 1].fill_betweenx([0, 0.02], [0, 0], [rzone, rzone],
                                   color=(0, 0.8, 1, 0.3))
 
         hist_unity, _ = np.histogram(use_dist_along_unity,
@@ -1724,7 +1805,13 @@ def plot_rew_rel_hist_across_an(multiDayData,
                              alpha=0.5
                              )
 
-        ax2[d_i].set_title("day %d, switch %d" % (day, d_i), fontsize=10)
+
+        if exclude_reward_cells:
+            ax2[d_i].set_title("day %d, switch %d, exc reward %d" % (
+                day, d_i, reward_dist_exclusive), fontsize=10)
+        else:
+            ax2[d_i].set_title("day %d, switch %d" % (day, d_i), fontsize=10)
+
         ax2[d_i].vlines(0, -np.pi, np.pi, color='k')
         ax2[d_i].vlines(-rdist_to_rad_exc, -rdist_to_rad_exc,
                         rdist_to_rad_exc, color='m')
@@ -1770,7 +1857,10 @@ def plot_rew_rel_hist_indiv_an(multiDayData,
                                ylim_max=None,
                                return_frac_above_shuf=False,
                                return_dist_along_unity=False,
-                               bin_size=(2*np.pi)/45):
+                               bin_size=(2*np.pi)/45,
+                              reward_dist_exclusive=None,
+                              **kwargs # histogram plotting kwargs
+                              ):
     """
     Plot histogram of distance between reward-relative peaks, compared to shuffle
     For INDIVIDUAL animals
@@ -1814,6 +1904,7 @@ def plot_rew_rel_hist_indiv_an(multiDayData,
             exclude_reward_cells=exclude_reward_cells,
             exclude_end_cells=exclude_end_cells,
             use_and_cells=use_and_cells,
+            reward_dist_exclusive=reward_dist_exclusive,
         )
         
         dist_btwn_rel_peaks = {}

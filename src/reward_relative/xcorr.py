@@ -1,13 +1,16 @@
 import numpy as np
 import scipy as sp
 import dask
+
 from sklearn.linear_model import LinearRegression as linreg
 
 import warnings
 
 from . import behavior as behav
 from . import utilities as ut
+
 # from dask.diagnostics import ProgressBar
+
 
 
 def xcorr(in1, in2, mode='same', window=None, bin_time=None, zscore=True):
@@ -169,7 +172,7 @@ def run_shuffle_xcorr(full_in1,
     """
     Calculate the xcorr relative to a shuffle using parallelization across CPU threads.
 
-    find the peak xcorr that exceeds 95% (the upper 97.5%) 
+    Find the peak xcorr that exceeds 95% (the upper 97.5%) 
     of the shuffle distribution. If axis_to_mean is an integer, xcorr is performed
     on the mean across axis_to_mean after shuffling in axis_to_shuffle.
 
@@ -265,6 +268,7 @@ def shuffle_xcorr(in1, in2,
                'CI_lo': xc_shuf_CI_low, 'CI_hi': xc_shuf_CI_hi}
 
     return {'lags': lags, 'xc_true': xc_vec, 'shuffle': xc_shuf, 'xc_peak_above_shuffle': xc_peaks_above_shuf_tmp}
+
 
 
 def lickspeed_xcorr(sess, window=4, trial_subset=None, mode='same'):

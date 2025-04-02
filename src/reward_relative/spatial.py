@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 
 import TwoPUtils as tpu
 
-from . import behavior as behav
+from . import behavior
 from . import utilities as ut
 from . import circ
 
@@ -61,6 +61,7 @@ def find_reward_cells(peaks0, peaks1, rzone0, rzone1, reward_dist=50):
     "Reward" cells are cells with peak firing position
     within reward_dist of the start of the reward zone
     """
+
     masks = np.logical_and(
         np.abs(peaks0-rzone0) <= reward_dist,
         np.abs(peaks1-rzone1) <= reward_dist
@@ -74,6 +75,7 @@ def find_track_cells(peaks0, peaks1, rzone0, rzone1, dist=50):
     "track" cells are cell that maintain their spatial
     firing position within dist across two sets of trials
     """
+
     cells_near_reward = find_reward_cells(peaks0, peaks1,
                                           rzone0, rzone1,
                                           reward_dist=dist)
@@ -135,6 +137,7 @@ def field_from_thresh(trial_mat, coord, cells=None,
             np.nanmin(trial_mean[:, cell], axis=axis)
         thresh = prctile * minmax + np.nanmin(trial_mean[:, cell], axis=axis)
         # trying the mean of the mean firing as the thresh
+
         # thresh = np.nanmean(trial_mean[:, cell])
 
         above_thresh = np.where(trial_mean[:, cell] > thresh)[0]
@@ -160,6 +163,7 @@ def field_from_thresh(trial_mat, coord, cells=None,
                      ],
                 coord=field,
                 axis=0)
+
             fields_per_cell['COM'][cell].append(field_COM)
 
     return fields_per_cell
@@ -465,10 +469,12 @@ def dist_rad_to_cm(rad, max_pos=450, min_pos=0, override_warning=False):
         raise NotImplementedError(
             f"Max pos {max_pos} should typically be larger than min pos {min_pos}; \n if you meant to do this, set override_warning=True")
 
+
     if type(rad) is list:
         rad = np.asarray(rad)
 
     return (rad / (2*np.pi))*(max_pos-min_pos)
+
 
 
 def circ_peak(activity, coord, max_pos=450, min_pos=0):
@@ -544,6 +550,7 @@ def cross_val_sort(trial_mat, axis=0):
     test_arr = trial_mat[1::2, :, sorts]
     # get the sorted training fr to use as reference for normalization
     max_fr = norms[:, sorts]
+
 
     return sorts, test_arr, max_fr
 
@@ -650,6 +657,29 @@ def get_frac_from_2D_peak_hist(peak_hist, reward0, reward1,
         return frac_near_reward, frac_near_diag, frac_elsewhere
 
 
+def interp_spatial_map(new_pos, orig_pos, orig_spatial_mat):
+    """
+    Linearly interpolate track positions and place cell activity
+    to a finer position scale
+
+    :param new_pos: new vector of positions, evenly spaced (1D)
+    :param orig_pos: original position bin centers (1D)
+    :param orig_spatial_mat: original spatially-binned, trial-averaged, smoothed rate map,
+                          cells x pos bins (2D)
+    :return: interpolated spatial rate map
+    """
+
+    ncells = orig_spatial_mat.shape[0]
+
+    new_spatial_mat = np.zeros((ncells, len(new_pos)))
+
+    for c in range(ncells):
+        new_spatial_mat[c, :] = np.interp(
+            new_pos, orig_pos, orig_spatial_mat[c, :])
+
+    return new_spatial_mat
+
+
 def population_vector(pop_mat, axis=1):
     """
     Create a population vector from position-binned data by horizontally
@@ -732,7 +762,7 @@ def is_putative_interneuron(sess, ts_key='dff', method='speed',
 
     :param sess: session class
     :param ts_key: key of timeseries to use
-    :param method: method of identifying ints: 'speed' or 'trial_mat_ratio'
+    :param method: method of identifying ints: 'speed' or 'trial_mat_ratio'; default: 'speed'
     :param prct: (for method 'trial_mat_ratio') percentile of ROIs within animal to cut off
     :param r_thresh: (for method 'speed') threshold for speed correlation r
     :return: is_int (list) with a Boolean for each ROI, where
@@ -849,6 +879,7 @@ def get_cell_classes(anim_sess, peaks_set0, peaks_set1, is_int,
                                                 )
                                                 )
 
+
     tmp_track = find_track_cells(peaks_set0, peaks_set1,
                                    rzone0, rzone1,
                                    dist=inclusive_dist)
@@ -860,6 +891,7 @@ def get_cell_classes(anim_sess, peaks_set0, peaks_set1, is_int,
                                                 )
                                                 )
 
+
     tmp_nonrewardremap = np.logical_and(
         np.logical_and(~tmp_track, ~tmp_reward), ~is_int)
     cell_class_masks['nonreward_remap'] = np.logical_and(tmp_nonrewardremap,
@@ -869,28 +901,33 @@ def get_cell_classes(anim_sess, peaks_set0, peaks_set1, is_int,
                                                          )
                                                          )
 
+
     mean_set0 = np.nanmean(
         np.nanmean(
             anim_sess['sess'].trial_matrices[ts_key][0][anim_sess
                                                         ['trial dict']['trial_set0'], :, :],
+
             axis=1),
         axis=0)
     mean_set1 = np.nanmean(
         np.nanmean(
             anim_sess['sess'].trial_matrices[ts_key][0][anim_sess
                                                         ['trial dict']['trial_set1'], :, :],
+
             axis=1),
         axis=0)
     sd_set0 = np.nanstd(
         np.nanmean(
             anim_sess['sess'].trial_matrices[ts_key][0][anim_sess
                                                         ['trial dict']['trial_set0'], :, :],
+
             axis=1),
         axis=0)
     prct50_set0 = np.nanpercentile(np.nanmean(
         anim_sess['sess'].trial_matrices[ts_key][0][anim_sess
                                                     ['trial dict']['trial_set0'], :, :],
         axis=1), 50, axis=0)
+
 
     # Trial set 1 mean must be > (trial set 0 mean + 1sd)
     tmp_appear = np.logical_and(mean_set1 > (mean_set0 + sd_set0),
@@ -903,7 +940,7 @@ def get_cell_classes(anim_sess, peaks_set0, peaks_set1, is_int,
                                                 ~is_int
                                                 )
 
-    # Trial set 1 mean must be < 50th percetile of mean FR per trial in set 0
+    # Trial set 1 mean must be < 50th percentile of mean FR per trial in set 0
     tmp_disappear = np.logical_and(mean_set1 < prct50_set0,  # - sd_set0),
                                    np.logical_and(
                                        anim_sess['pc masks set0'],
@@ -913,6 +950,7 @@ def get_cell_classes(anim_sess, peaks_set0, peaks_set1, is_int,
     cell_class_masks['disappear'] = np.logical_and(tmp_disappear,
                                                    ~is_int
                                                    )
+
 
     cell_class_masks['not_place_cells'] = np.logical_and(
         ~anim_sess['pc masks set0'],
@@ -944,6 +982,7 @@ def circ_shift_trial_matrix(sess,
                             keep_teleports=False,
                             use_speed_thr=True,
                             **kwargs):
+
     """
     Compute a trial matrix in circular coordinates and circularly shift the second trial set 
         to align both sets at some feature (e.g. the starts of the reward zones).
@@ -973,7 +1012,6 @@ def circ_shift_trial_matrix(sess,
     if pos is None:
         pos = np.copy(sess.vr_data['pos'].values)
 
-    # teleport starts at -50, so add 50 to make it start at 0 and track end at 500
     circ_pos = pos_cm_to_rad(pos, max_pos, min_pos=min_pos)
     trial_dict = behavior.define_trial_subsets(sess, force_two_sets=True)
     rzone0 = np.unique(reward_zone[trial_dict['trial_set0'], :])
@@ -990,6 +1028,7 @@ def circ_shift_trial_matrix(sess,
         trial_set0 = trial_dict['trial_set0'][1:]
         trial_set1 = trial_dict['trial_set1'][1:]
         reward_zone = reward_zone[1:, :]
+
     else:
         tstart_inds = sess.trial_start_inds
         tstop_inds = sess.teleport_inds
@@ -1012,6 +1051,7 @@ def circ_shift_trial_matrix(sess,
                                                 speed=speed,
                                                 **kwargs
                                                 )
+
 
     # find the number of indices that aligns rzone1 with rzone 1
     if rzone0[0] > rzone1[0]:
@@ -1068,7 +1108,6 @@ def circ_align(data0, rzone0, data1=None, rzone1=None, max_pos=450, min_pos=0):
     """
     circularly align position data with both reward zone starts,
     such that reward is at 0 across both data sets
-
     inputs are specifically meant to be vectors of linear positions in cm
     """
 
@@ -1301,3 +1340,4 @@ def calc_place_cells(
         "stability masks0": stability_masks0,
         "stability masks1": stability_masks1,
     }
+

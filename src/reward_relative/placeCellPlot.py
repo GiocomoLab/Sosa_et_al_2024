@@ -654,11 +654,11 @@ def plot_all_single_cells(sess,
                         if circ_shift:
                             f = circ.wrap(spatial.pos_cm_to_rad(
                                 f, max_pos, min_pos) + circ.wrap(spatial.pos_cm_to_rad(
-                                rzone0[0], max_pos, min_pos=min_pos
-                                
-                            ) - spatial.pos_cm_to_rad(rzone1[0], max_pos, min_pos=min_pos
-                                                                                                                 
-                                                     )))
+                                    rzone0[0], max_pos, min_pos=min_pos
+
+                                ) - spatial.pos_cm_to_rad(rzone1[0], max_pos, min_pos=min_pos
+
+                                                          )))
 
                         c_ax.plot(f,
                                   np.zeros((len(f),))-2,
@@ -675,7 +675,9 @@ def plot_all_single_cells(sess,
             #               , 'g.', markersize=5) for f in field_pos[cellID[cell]]]
 
         # c_ax.set_yticks([])
-        # c_ax.set_xticks([])
+
+        c_ax.set_xticks([0, 225, 450])
+
         if label_by_keys is not None:
             c_ax.set_title("%d, %s" % (int(cellID[cell]),
                                        [f'{use_metrics[key][cellID[cell]]:.2f}' for key in label_by_keys]))

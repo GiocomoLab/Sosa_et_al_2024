@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import scipy as sp
+import pandas as pd
 import dill
 import warnings
 import math
@@ -8,10 +9,10 @@ from datetime import datetime
 
 from . import behavior as behav
 from . import preprocessing as pp
-from . import spatial
 from . import sessions_dict
 
 from reward_relative.sessions_dict import single_plane, multi_plane
+from reward_relative.spatial import calc_place_cells
 
 all_sess = single_plane
 all_sess.update(multi_plane)
@@ -33,6 +34,14 @@ def print_full():
     np.set_printoptions(threshold=sys.maxsize)
     return
 
+def print_full_df(df):
+    """ print a full dataframe """
+    with pd.option_context('display.max_rows', None,
+                       'display.max_columns', None,
+                       'display.precision', 3,
+                       ):
+        display(df)
+
 def make_anim_tag(anim_list):
     """ Make a string of animal numbers, connected by hyphens """
     anim_tag = "-".join([get_mouse_number(s) for s in anim_list])
@@ -45,7 +54,6 @@ def make_day_tag(day_list):
     return day_str
 
 def make_fig_dir(path_dict):    
-    
     """ make a month-year figure directory to save figures """
     myyyy = datetime.now().strftime("%b") + datetime.now().strftime("%Y")
     fig_dir = os.path.join(path_dict['fig_dir'],myyyy)
@@ -112,8 +120,6 @@ def load_sess_pickle(basedir, animal, day=None, exp_day=None):
 
 def quick_load_multi_anim_sess(day, experiment='MetaLearn', anim_list=None, params=None):
     """ Quickly load pre-saved, processed data, assuming some file paths exist """
-
-    # experiment = 'MetaLearn' # 'NeuroMods' or 'MetaLearn' of 'EnvSwitch'
     from reward_relative import dayData as dd
     from reward_relative.path_dict_firebird import path_dictionary as path_dict
     
@@ -438,6 +444,14 @@ def intersection(list1, list2):
     intersect = [value for value in list1 if value in list2]
     return intersect
 
+def interp_nans(y_):
+    
+    y = np.copy(y_)
+    nans = np.isnan(y)
+    x = np.arange(0, len(y)).astype(int)
+    y[nans]= np.interp(x[nans], x[~nans], y[~nans])
+    
+    return y
 
 def center_of_mass(data, coord=None, axis=0):
     """
@@ -674,6 +688,7 @@ def compute_SSE_from_matrix(X, axis=0):
     sse = np.sum((np.nanmean(X,axis=axis)-X)**2)
     return sse
 
+
 ## ------------------------------------------------------------------##
 """
 Below is a much larger 'utility' for running preprocessing and storage
@@ -742,7 +757,6 @@ def multi_anim_sess(
             keep_teleports_this_an = dff_method["keep_teleports"]
         else:
             keep_teleports_this_an = dff_method["keep_teleports"][an_i]
-            
 
         if calc_dff:
             if len(sess.timeseries["F"].shape) == 3:
@@ -841,14 +855,9 @@ def multi_anim_sess(
 
                 sess.add_timeseries(dff=dFF)
                 sess.add_pos_binned_trial_matrix("dff", "pos")
-            # sess.add_pos_binned_trial_matrix("spks", "pos")
-            # sess.add_timeseries(
-            #     spks_norm=sess.timeseries["spks"]
-            #               / np.nanpercentile(sess.timeseries["spks"], 99, axis=1, keepdims=True)
-            # )
-            # sess.add_pos_binned_trial_matrix("spks_norm", "pos")
 
         isreward, morph = behav.get_trial_types(sess)
+
         reward_zone, rz_label = behav.get_reward_zones(sess)
 
         trial_dict = behav.define_trial_subsets(sess, force_two_sets=trial_subsets)
@@ -865,7 +874,7 @@ def multi_anim_sess(
             else:
                 speed = None
 
-            pc_out = spatial.calc_place_cells(
+            pc_out = calc_place_cells(
                 sess,
                 ts_key=ts_key,
                 trial_subsets=trial_subsets,
@@ -921,7 +930,5 @@ def multi_anim_sess(
             })
 
     return all_anim
-
-
 
 

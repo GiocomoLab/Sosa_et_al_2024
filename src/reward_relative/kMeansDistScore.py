@@ -1,6 +1,7 @@
 import sys
 sys.path.append("/home/mari/local_repos/lvl")
 # uses Alex William's lvl repo: https://github.com/ahwillia/lvl
+
 from lvl.factor_models import KMeans as lvl_kmeans
 from lvl.factor_models import NMF as lvl_soft_kmeans
 from lvl.resamplers import RotationResampler
@@ -12,13 +13,13 @@ from scipy.spatial.distance import pdist, squareform
 from sklearn.impute import KNNImputer
 from scipy.optimize import curve_fit
 
-import sys
 import numpy as np
 import scipy as sp
 import pandas as pd
 from tqdm import tqdm
 
 # Isabel Low's functions
+
 def clu_distance_population(Y, H, map_idx):
     '''
     Calculate the distance between the population activity and 
@@ -211,6 +212,7 @@ def optimal_k(Y_in,  max_k = 4, k_reps=10, shuffle_reps = 10, alpha=0.05, verbos
                             shuff_km_test_scores[chosenkidx,:][0], alternative = 'greater')
     res_train = sp.stats.wilcoxon(km_train_scores[chosenkidx,:][0], 
                                   shuff_km_train_scores[chosenkidx,:][0], alternative = 'greater')
+
     onemap = []
     if res.pvalue <= alpha:
         if verbose:
