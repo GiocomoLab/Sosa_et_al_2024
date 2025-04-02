@@ -1265,12 +1265,12 @@ def plot_sequences(_multiDayData,
                     max_pos = _multiDayData[d].activity_matrix[an][-2][-1]
                     min_pos = _multiDayData[d].activity_matrix[an][-2][0]
                 else:
-                    max_pos = _multiDayData[d].pos_bin_centers[an][-1] + \
+                    max_pos = _multiDayData[d].pos_bin_centers[-1] + \
                         np.mean(
-                            np.diff(_multiDayData[d].pos_bin_centers[an]))/2
-                    min_pos = _multiDayData[d].pos_bin_centers[an][0] - \
+                            np.diff(_multiDayData[d].pos_bin_centers))/2
+                    min_pos = _multiDayData[d].pos_bin_centers[0] - \
                         np.mean(
-                            np.diff(_multiDayData[d].pos_bin_centers[an]))/2
+                            np.diff(_multiDayData[d].pos_bin_centers))/2
 
                 # find the mean of the session per cell for normalization
                 norm_per_cell = np.nanmean(np.nanmean(
@@ -1313,7 +1313,7 @@ def plot_sequences(_multiDayData,
                             keep, _multiDayData[d].reward_rel_cell_ids[an])]
 
                 if exc_end_cells:
-                    pos = _multiDayData[d].pos_bin_centers[an]
+                    pos = _multiDayData[d].pos_bin_centers
                     print(
                         'excluding end cells assuming first and last bin are the ends')
                     end_cells = np.logical_or(
