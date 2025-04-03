@@ -190,7 +190,7 @@ def define_trial_subsets(sess, force_two_sets=False):
         fig_str = "AvsBtrials"
         label0 = "A trials"
         label1 = "B trials"
-        print("set 0: A trials / set 1: B trials")
+        # print("set 0: A trials / set 1: B trials")
 
     elif  ('B_to_A' in sess.scene):
 
@@ -199,7 +199,7 @@ def define_trial_subsets(sess, force_two_sets=False):
         fig_str = "BvsAtrials"
         label0 = "B trials"
         label1 = "A trials"
-        print("set 0: B trials / set 1: A trials")
+        # print("set 0: B trials / set 1: A trials")
 
     
     elif sess.scene in ['Env1_LocationA', 'Env2_LocationA', 'Env3_LocationA']:
@@ -269,8 +269,8 @@ def define_trial_subsets(sess, force_two_sets=False):
                 fig_str = f"{zone0}vs{zone1}trials"
                 label0 = f"{zone0} trials"
                 label1 = f"{zone1} trials"
-                print(
-                    f"set 0: {zone0} trials / set 1: {zone1} trials")
+                # print(
+                #     f"set 0: {zone0} trials / set 1: {zone1} trials")
             else:
                 two_sets = False
                 zone0 = zone_id[np.argmin(zone_trial)]
@@ -290,8 +290,8 @@ def define_trial_subsets(sess, force_two_sets=False):
                     label0 = f"{zone0} trials"
                     label1 = ''
                     fig_str = f"{zone0}trials"
-                    print(
-                        f"There is only 1 set: {zone0} trials")
+                    # print(
+                    #     f"There is only 1 set: {zone0} trials")
 
         except:
             raise NotImplementedError(
@@ -492,8 +492,12 @@ def plot_norm_lick_raster(sess,
 
     # find reward zone coordinates
     if rzone_labels is not None:
-        change_trial = np.where(rzone_labels != rzone_labels[0])[0][0]
-        rz, _ = get_reward_zones(sess, change_trial=change_trial)
+        if hasattr(sess, 'change_reward_trial'):
+            rz, _ = get_reward_zones(sess, change_trial = sess.change_reward_trial)
+            # change_trial = np.where(rzone_labels != rzone_labels[0])[0][0]
+            # rz, _ = get_reward_zones(sess, change_trial=change_trial)
+        else:
+            rz, _ = get_reward_zones(sess)  
     else:
         rz, rzone_labels = get_reward_zones(sess)
 
@@ -580,8 +584,12 @@ def plot_norm_speed_raster(sess, ax=None, sort_by=None, isreward=None, morph=Non
 
     # find reward zone coordinates
     if rzone_labels is not None:
-        change_trial = np.where(rzone_labels != rzone_labels[0])[0][0]
-        rz, _ = get_reward_zones(sess, change_trial=change_trial)
+        if hasattr(sess, 'change_reward_trial'):
+            rz, _ = get_reward_zones(sess, change_trial = sess.change_reward_trial)
+            # change_trial = np.where(rzone_labels != rzone_labels[0])[0][0]
+            # rz, _ = get_reward_zones(sess, change_trial=change_trial)
+        else:
+            rz, _ = get_reward_zones(sess)  
     else:
         rz, rzone_labels = get_reward_zones(sess)
 

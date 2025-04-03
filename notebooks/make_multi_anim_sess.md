@@ -21,8 +21,8 @@ pickle files will be named: \
 `<animal-numbers>_expday<day_number>_speed<thr>_perms<nperms>_<dff-baseline-method>_<timeseries-for-place-cells>.pickle`  \
 and saved in `path_dict['preprocessed_root']/multi_anim_sess/`.
 
-For example, if the animals' original names were GCAMP4, GCAMP5, GCAMP6, the file will be:  \
-`4-5-6_expday1_speed2_perms100_maximin_events.pickle`
+For example, if the animals' original names were GCAMP2, GCAMP3, GCAMP4, the file will be:  \
+`2-3-4_expday1_speed2_perms100_maximin_events.pickle`
 for the 1st experiment day (1-indexed), with the following parameters:
 * speed threshold >2 cm/s for data included to calculate place cells
    * NOTE: trial matrices in ['sess'] are still the originals stored in the `sess` of each animal,  \
@@ -179,10 +179,6 @@ tmp_list = np.unique(np.concatenate(
 max_anim_list = sorted(tmp_list, key=len)
 print(max_anim_list)
 max_anim_tag = "-".join([ut.get_mouse_number(s) for s in max_anim_list])
-```
-
-```python
-multi_anim_sess.keys()
 ```
 
 <!-- #region tags=[] -->

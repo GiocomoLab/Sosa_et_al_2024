@@ -702,6 +702,7 @@ def plot_single_cells_w_similarity_matrix(an,
                                           sigma=1,
                                           circ_shift=False,
                                           use_speed_thr=True,
+                                          max_cells=None,
                                           sim_method='correlation',
                                           max_pos=450,
                                           min_pos=0,
@@ -725,6 +726,7 @@ def plot_single_cells_w_similarity_matrix(an,
                         ['sess'].vr_data['speed'].values)
     else:
         speed = None
+    
 
     figtag = ''
     if circ_shift:
@@ -806,6 +808,11 @@ def plot_single_cells_w_similarity_matrix(an,
         pc_masks[cell_mask] = True
     else:
         pc_masks = cell_mask
+        
+    if max_cells is None:
+        max_cells = pc_masks.sum()
+    else:
+        max_cells = np.min([max_cells, pc_masks.sum()])
 
     cell_sim_mat = dict()
 
@@ -823,11 +830,12 @@ def plot_single_cells_w_similarity_matrix(an,
 
     # ---- Plot single cell place fields and trial-by-trial similarity matrices ----
 
-    cell_range = [0, pc_masks.sum()]
+    cell_range = [0, max_cells]
 
     xstride = 3
     ystride = 3
     nperrow = 8
+    
     fig = plt.figure(figsize=[nperrow * xstride,
                               cell_range[-1] / nperrow * ystride])
     gs = gridspec.GridSpec(
