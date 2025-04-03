@@ -127,7 +127,8 @@ Processed data (starting with `sess` classes) exist in 3 current levels of organ
    2. See make_session_pkl.ipynb
    3. Original code to construct the sess lives in the TwoPUtils repo
 2. `multi_anim_sess`: computes dFF, calculates place cells, adds details like a trial set dictionary, and collects these and the sess data for multiple animals on a single day. Useful so you can work off a constant set of place cell IDs (since place cells are identified by their spatial information relative to a shuffle, which is stochastic for each run of the shuffle for cells that are borderline significant).
-   1. See `./notebooks/make_multi_anim_sess.ipynb`
+   1. See the [multi_anim_sess README](docs/multi_anim_sess_README.md) for a detailed description.
+   1. See also `./notebooks/make_multi_anim_sess.ipynb`
 3. `dayData`: class that takes multi_anim_sess as an input and performs additional computations like finding place cell peaks, computing circular distance between peaks relative to reward, computing correlation matrices, etc.
    1. Original sess data are not re-saved here, but a copy of the trial matrices are kept.
    2. `dayData.py` lives in the reward_relative modules
