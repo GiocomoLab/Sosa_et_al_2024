@@ -66,7 +66,16 @@ def make_date_string():
     
     return datetime.now().strftime("%Y%m%d-%H%M")
 
-
+def write_source_csv(data, fig):
+    """ Write pandas dataframe to csv for figure source data """
+    from reward_relative.path_dict_firebird import path_dictionary as path_dict
+    filepath = os.path.join(path_dict['preprocessed_root'],
+                             'source_data',
+                             f'Fig{fig}.csv')
+    data.to_csv(filepath) #, header=True, index=False, sep=',', mode='a')
+    
+    print('writing', filepath)
+    
 def write_sess_pickle(sess, sess_dir, pkl_name, overwrite=False):
     """
     Write a sess class to a .pickle file
