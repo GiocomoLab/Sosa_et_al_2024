@@ -84,7 +84,7 @@ def get_omission_inds(sess):
     :param sess:
     :return:
     """
-    isreward, _, _ = behav.get_trial_types(sess)
+    isreward, _ = behav.get_trial_types(sess)
     reward_zone, _ = behav.get_reward_zones(sess)
 
     trial_subset = isreward==0
@@ -110,7 +110,7 @@ def get_omission_trials(sess):
     :param sess:
     :return:
     """
-    isreward, _, _ = behav.get_trial_types(sess)
+    isreward, _ = behav.get_trial_types(sess)
 
     # find unrewarded trials
     trial_subset = isreward==0

@@ -155,7 +155,7 @@ def quick_load_multi_anim_sess(day, experiment='MetaLearn', anim_list=None, para
     spd = '2'
     perms = 100
     all_anim = {}
-    pkl_path = os.path.join(path_dict['preprocessed_root'],'multi_anim_sess',
+    pkl_path = os.path.join(path_dict['preprocessed_root'],'toShare','cleaned_w_F',
                            ('%s_expday%d_speed%s_perms%d_%s_%s.pickle' % (max_anim_tag, 
                                                                      day,
                                                                      str(params['speed_thr']),

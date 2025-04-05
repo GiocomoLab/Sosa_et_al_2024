@@ -1,6 +1,7 @@
+import sys
+sys.path.append("/home/mari/local_repos/2p_repos/GLM_Tensorflow_2/code")
 import glm_class as glm
 import math
-import sys
 import os
 import numpy as np
 import scipy as sp
@@ -23,8 +24,7 @@ from sklearn.model_selection import train_test_split, GroupShuffleSplit
 from sklearn.preprocessing import SplineTransformer, QuantileTransformer
 import tensorflow as tf
 import keras
-import sys
-sys.path.append("/home/mari/local_repos/2p_repos/GLM_Tensorflow_2/code")
+
 
 # Several of the modules below are adaptations of functions originally
 # written by Shih-Yi Tseng, https://github.com/sytseng/GLM_Tensorflow_2/tree/main
