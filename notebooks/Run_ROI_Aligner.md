@@ -134,12 +134,9 @@ sess2.iscell[:,0].sum()
 ```
 
 ```python
-sess.n_planes, sess.s2p_stats.shape, sess.s2p_ops['Lx'] # stats for each good cell
-# for multiplane, FOVs of each plane get stacked next to each other so they have double the number of y pixels (1592)
-```
-
-```python
 # This is the mask per roi that the alignment algorithm sees
+# Note that for multiplane animals, FOVs of each plane get stacked 
+# next to each other so they have double the number of y pixels (1592 instead of 796)
 roistack = np.zeros([sess.s2p_stats.shape[0], sess.s2p_ops['Ly'], sess.s2p_ops['Lx']]).astype(np.float32)
 for i, roi in enumerate(sess.s2p_stats):
     roistack[i, roi['ypix'], roi['xpix']] = 1
