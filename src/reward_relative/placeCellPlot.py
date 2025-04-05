@@ -1299,9 +1299,10 @@ def plot_sequences(_multiDayData,
                 else:
                     if celltype == 'rr':
                         keep = _multiDayData[d].reward_rel_cell_ids[an]
-                    elif celltype == 'stable':
+                    elif celltype == 'track':
                         keep = np.where(
-                            _multiDayData[d].cell_class[an]['masks']['stable'])[0]
+                            _multiDayData[d].cell_class[an]['masks']['track'])[0]
+                    elif celltype == 'appear':
                         keep = np.where(
                             _multiDayData[d].cell_class[an]['masks']['appear'])[0]
                     elif celltype == 'disappear':
@@ -1310,15 +1311,13 @@ def plot_sequences(_multiDayData,
                     elif celltype == 'nonreward_remap':
                         keep = np.where(
                             _multiDayData[d].cell_class[an]['masks']['nonreward_remap'])[0]
-                    elif celltype == 'unstable':
-                        keep = np.where((_multiDayData[d].cell_class[an]['masks']['appear'] |
-                                         _multiDayData[d].cell_class[an]['masks']['disappear'] |
-                                         _multiDayData[d].cell_class[an]['masks']['nonreward_remap']
-                                         ))[0]
+                    else:
+                        raise NotImplementedError("This cell type is not defined")
+                        
                     if celltype != 'rr':
                         # exclude cells that also qualified as RR
-                        print(
-                            f'how many {celltype} were also RR? {np.sum(np.isin(keep, _multiDayData[d].reward_rel_cell_ids[an]))}')
+                        # print(
+                        #     f'how many {celltype} were also RR? {np.sum(np.isin(keep, _multiDayData[d].reward_rel_cell_ids[an]))}')
                         keep = keep[~np.isin(
                             keep, _multiDayData[d].reward_rel_cell_ids[an])]
 
@@ -1616,6 +1615,6 @@ def plot_sequences(_multiDayData,
             )
 
     if plot:
-        return seq, fig, fig_q
+        return seq, seq_df, fig, fig_q
     else:
-        return seq, [], []
+        return seq, seq_df, [], []
