@@ -1182,11 +1182,11 @@ class dayData:
         bool_to_include = {}
         inds_to_include = {}
         
-        if use_and_cells:
-            if self.place_cell_logical == 'and':
-                print('Already using "and" place cells')
-            else:
-                print('Switching from "or" to "and" place cells')
+        # if use_and_cells:
+        #     if self.place_cell_logical == 'and':
+        #         print('Already using "and" place cells')
+        #     else:
+        #         print('Switching from "or" to "and" place cells')
 
         for an in self.anim_list:
                 
@@ -1235,18 +1235,23 @@ class dayData:
                                                      self.rzone_pos[an]['set 0'][0],
                                                      self.rzone_pos[an]['set 1'][0],
                                                      reward_dist=reward_dist_exclusive)
+                        reward_cell_ids = np.where(is_reward_cell)[0] # index into all cells (place cell ID)
                     elif dist_metric == 'circular':
                     
                         # use circular distance from reward
                         circ_thresh = spatial.dist_cm_to_rad(reward_dist_exclusive, max_pos=450, min_pos=0)
-                        # is_reward_cell = np.logical_and(
-                        is_reward_cell = np.logical_and(
-                            circ.phase_diff(spatial.dist_cm_to_rad(self.peaks[an]['set 0'], 450,0),
-                                            spatial.dist_cm_to_rad(self.rzone_pos[an]['set 0'][0], 450, 0)) <= circ_thresh,
-                            circ.phase_diff(spatial.dist_cm_to_rad(self.peaks[an]['set 1'], 450,0),
-                                            spatial.dist_cm_to_rad(self.rzone_pos[an]['set 1'][0], 450, 0)) <= circ_thresh,
-                        )
-                    reward_cell_ids = np.where(is_reward_cell)[0]
+                        
+                        ## Remember: rel_peaks output is the length of the PLACE cells, peaks is the length of ALL cells
+                        ## also rel_peaks is initially signed, but here we care about absolute distance
+                        ## Find the place cells with relative distance < circ_thresh from reward (from 0)
+                        
+                        abs_rel_peaks0 = circ.phase_diff(self.rel_peaks[an]['set 0'], 0)
+                        abs_rel_peaks1 = circ.phase_diff(self.rel_peaks[an]['set 1'], 0)
+                        # in this version is_reward_cell is an index into the place cells, not a boolean
+                        is_reward_cell = np.logical_and(abs_rel_peaks0 <= circ_thresh,
+                                                        abs_rel_peaks1 <= circ_thresh)
+                        
+                        reward_cell_ids = place_cell_ids[is_reward_cell] #np.where(is_reward_cell)[0]
   
                 not_near_reward = ~np.isin(place_cell_ids, reward_cell_ids)
                 bool_to_include[an] = np.multiply(
@@ -1601,6 +1606,8 @@ def plot_rew_rel_hist_across_an(multiDayData,
             exclude_end_cells=exclude_end_cells,
             use_and_cells=use_and_cells,
             reward_dist_exclusive=reward_dist_exclusive,
+            dist_metric='circular'
+            
         )
 
         for an in include_ans:
@@ -2161,7 +2168,7 @@ def get_cell_class_n(_multiDayData, day, an, exclude_rr_from_others=True, verbos
     # check for duplicates in the exclusive categories:
     check_inds = np.concatenate([inds[ct] for ct in ['track', 'appear', 'disappear', 'rr', 'nonreward_remap']])
     if len(check_inds) != len(np.unique(check_inds)):
-        print('duplicates detected')
+        print('"exclude_rr_from_others" is set to False')
         
     unclassified = np.where(_multiDayData[day].overall_place_cell_masks[an])[0][
         ~np.isin(np.where(_multiDayData[day].overall_place_cell_masks[an])[0], classified_inds)]
