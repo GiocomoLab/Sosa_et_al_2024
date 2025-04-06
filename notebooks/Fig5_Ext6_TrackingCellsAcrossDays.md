@@ -195,7 +195,7 @@ for an in anim_list:
     [tracked[an].update({cat: {}}) for cat in cats]
 
 # option to limit to cells with sig. SI before AND after the switch
-limit_rr_to_and = True
+limit_rr_to_and = False
 
 df = pd.DataFrame(columns=['mouse',
                            'combo_len',
