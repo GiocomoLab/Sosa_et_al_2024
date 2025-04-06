@@ -115,7 +115,7 @@ def load_multi_anim_sess(path_dict, exp_day, an_list,
 
     # load from previously saved multi_an pickle
     try:
-        pkl_path = os.path.join(path_dict['preprocessed_root'], 'multi_anim_sess',
+        pkl_path = os.path.join(path_dict['preprocessed_root'], 'toShare', 'cleaned_w_F',
                                 ('%s_expday%d_speed%s_perms%d_%s_%s.pickle' % (
                                     an_tag, exp_day, params['speed'],
                                     params['nperms'], params['baseline_method'],
@@ -126,7 +126,7 @@ def load_multi_anim_sess(path_dict, exp_day, an_list,
         multi_an_sess = dill.load(open(pkl_path, "rb"))
 
     except:
-        pkl_path = os.path.join(path_dict['preprocessed_root'], 'multi_anim_sess',
+        pkl_path = os.path.join(path_dict['preprocessed_root'], 'toShare', 'cleaned_w_F',
                                 ('%s_expday%d_speed%s_perms%d_%s.pickle' % (
                                     an_tag, exp_day, params['speed'],
                                     params['nperms'], params['baseline_method'],

@@ -210,8 +210,17 @@ def lmm_plot(x,
                       data=df_copy, missing='drop').fit(reml=reml)
     if verbose:
         print(lmm.summary())
+        
+    # with a single fixed effect, the p-values from the wald test (chi2 distribution)
+    # and from the z-test (reported in the lmm.summary() table) are the same
+    
+    # but let's report the Wald test pvalue for consistency across models
+    results_table = lmm.wald_test_terms().table
+    pvalue = results_table.loc[x, "pvalue"]
+    
     ax.set_title("coef = %.3f, p = %.2e, conv=%s" % (
-        lmm.fe_params[x], lmm.pvalues[x], str(lmm.converged)), fontsize=10)
+        lmm.fe_params[x], pvalue, str(lmm.converged)), fontsize=10)
+    
     df_copy['predict'] = lmm.predict(df_copy)
     if logit_expit:
         df_copy['predict'] = sp.special.expit(df_copy['predict'])
