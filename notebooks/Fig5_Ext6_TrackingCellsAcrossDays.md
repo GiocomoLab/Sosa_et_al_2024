@@ -113,111 +113,6 @@ include_ans = multiDayData[exp_days[-1]
                            ].circ_rel_stats_across_an['include_ans']
 ```
 
-### Plot some cells tracked across days that were RR on the specified ref day
-
-```python
-# Plot cells tracked across days
-from reward_relative.sessions_dict import single_plane
-days_to_align = exp_days
-
-# Find aligned cells for the specified days from roi_aligner_results.pkl
-common_rois = roiAlign.find_common_rois(max_anim_list, days_to_align)
-
-max_cells = 100  # num cells allowed in gridspec layout
-
-xstride = 3
-ystride = 3
-
-base_pkl_path = os.path.join(path_dict['preprocessed_root'], "sess")
-# get session metadata
-
-an = 'GCAMP19'
-ref_day = 14
-day_ind = ut.get_ind_of_exp_day(single_plane, an, ref_day)
-
-# index of reward rel cell ID in the tracked cell list
-find_tracked = ut.lookup_ind_exact(multiDayData[ref_day].reward_rel_cell_ids[an],
-                                   common_rois[an]['common_rois'][days_to_align.index(ref_day), :])
-
-find_tracked = find_tracked[~np.isnan(find_tracked)].astype(int)
-fig, ax = plt.subplots(len(find_tracked), len(
-    days_to_align)*2, figsize=(len(days_to_align)*2.5, 2*len(find_tracked)))
-
-roi_match = dill.load(
-    open(os.path.join(base_pkl_path, an, 'roi_aligner_results.pkl'), "rb"))
-
-for d_i, day in enumerate(days_to_align):
-
-    for c_i, cell_ind in enumerate(find_tracked):
-
-        # where is this cell on this day
-        for j, entry in enumerate(roi_match['sess_deets']):
-            if entry["exp_day"] == day:
-                day_ind = j
-
-        cell_id_this_day = common_rois[an]['common_rois'][days_to_align.index(
-            day), cell_ind]
-        iou_this_day = common_rois[an]['iou'][days_to_align.index(
-            day), cell_ind]
-        is_pc = np.isin(cell_id_this_day, np.where(
-            multiDayData[day].overall_place_cell_masks[an])[0])
-
-        #ID = np.where(pc_masks)[0][cell]
-        pf, pf_vlim = placeCellPlot.single_cell_mat(
-            cell_id_this_day, multiDayData[day].events[an],
-            sigma=1, normalization_method="mean"
-        )
-
-        # Plot the cell trial-by-trial firing pattern each day
-        placeCellPlot.plot_single_cell(
-            ax[c_i, d_i],
-            trial_mat=pf,
-            vlim=pf_vlim,
-            reward_zone=multiDayData[day].rzone_by_trial[an],
-            markersize=1,
-            label_axes=False,
-        )
-
-        sess_deets = roi_match['sess_deets'][day_ind]
-
-        # Plot the local FOV
-        if not np.isnan(sess_deets['scan']):
-            with open(os.path.join(base_pkl_path, an, sess_deets['date'], 
-                                   "%s_%.3d_%.3d.pickle" % (sess_deets['scene'], 
-                                                            sess_deets['session'], sess_deets['scan'])), 'rb') as file:
-                sess = dill.load(file)
-
-                roi_com = [sess.s2p_stats[cell_id_this_day]['ypix'].mean(
-                ), sess.s2p_stats[cell_id_this_day]['xpix'].mean()]
-
-                ybounds = [int(max(0, roi_com[0]-50)),
-                           int(min(512, roi_com[0]+50))]
-                xbounds = [int(max(0, roi_com[1]-50)),
-                           int(min(796*sess.n_planes, roi_com[1]+50))]
-
-                ax[c_i, d_i+len(days_to_align)].imshow(sess.s2p_ops['meanImg'][ybounds[0]                                                                               :ybounds[1], xbounds[0]:xbounds[1]], cmap='Greys_r', aspect='auto')
-                roi = np.zeros([512, 796*sess.n_planes])*np.nan
-                roi[sess.s2p_stats[cell_id_this_day]['ypix'],
-                    sess.s2p_stats[cell_id_this_day]['xpix']] = 1
-        ax[c_i, d_i+len(days_to_align)].imshow(roi[ybounds[0]:ybounds[1],
-                                                   xbounds[0]:xbounds[1]], cmap='bwr_r', alpha=.55)
-        ax[c_i, d_i+len(days_to_align)
-           ].set_title(f"cell {cell_id_this_day}, day {day}", fontsize=9)
-        ax[c_i, d_i+len(days_to_align)].set_xticks([])
-        ax[c_i, d_i+len(days_to_align)].set_yticks([])
-
-        ax[c_i, d_i].set_title(
-            f"cell {cell_id_this_day}, day {day}, \n pc {is_pc*1}", fontsize=9)
-
-fig.patch.set_facecolor("white")
-
-save_figure = False
-if save_figure:
-    pt.savefig(fig, fig_dir, ("%s_expdays%d-%d_rewRelRemap_ROItrack_events_%s_red" % (
-        an, days_to_align[0], days_to_align[-1], place_cell_logical))
-    )
-```
-
 # Main loop to match cells by remapping type
 
 [Back to table of contents](#Table-of-Contents)
@@ -300,7 +195,7 @@ for an in anim_list:
     [tracked[an].update({cat: {}}) for cat in cats]
 
 # option to limit to cells with sig. SI before AND after the switch
-limit_rr_to_and = False
+limit_rr_to_and = True
 
 df = pd.DataFrame(columns=['mouse',
                            'combo_len',
@@ -557,15 +452,18 @@ for n in combo_list:
 ### Plot tracked cell types with ROIs
 
 ```python
-an_list = ['GCAMP18']
+an_list = ['GCAMP12']
 ds_i = 5
 base_pkl_path = os.path.join(path_dict['preprocessed_root'],"sess")
 
 # cell class on ref day
-key = 'rr'  # 'rr', 'track', 'pc', 'nonpc', 'appear', 'disappear', 'nontrack_pc'
+key = 'nonpc'  # 'rr', 'track', 'pc', 'nonpc', 'appear', 'disappear', 'nontrack_pc'
 
 # what the cell converts into
 become_key = 'rr' # 'rr' or 'track'
+
+# for square aspect
+aspect = 796/512
 
 for an in an_list:
 
@@ -613,7 +511,7 @@ for an in an_list:
                 is_pc = np.isin(cell_id_this_day, 
                                 np.where(multiDayData[day].overall_place_cell_masks[an])[0])
 
-
+                # Plot the cell trial-by-trial firing pattern each day
                 placeCellPlot.plot_single_cell(
                     ax[c_i, d_i],
                     trial_mat=pf,
@@ -629,7 +527,8 @@ for an in an_list:
                         day_ind = j
 
                 sess_deets = roi_match['sess_deets'][day_ind]
-
+                
+                # Plot the local FOV
                 if not np.isnan(sess_deets['scan']):
                     with open(os.path.join(base_pkl_path, an, sess_deets['date'],
                                            "%s_%.3d_%.3d.pickle" % (sess_deets['scene'], 
@@ -640,20 +539,24 @@ for an in an_list:
                         roi_com = [sess.s2p_stats[cell_id_this_day]['ypix'].mean(), 
                                    sess.s2p_stats[cell_id_this_day]['xpix'].mean()]
 
-                        ybounds = [int(max(0,roi_com[0]-50)), int(min(512,roi_com[0]+50))]
-                        xbounds = [int(max(0,roi_com[1]-50)), int(min(796*sess.n_planes,roi_com[1]+50))]
+                        ybounds = [int(max(0,roi_com[0]-40)), int(min(512,roi_com[0]+40))]
+                        xbounds = [int(max(0,roi_com[1]-(40*aspect))), int(min(796*sess.n_planes,roi_com[1]+(40*aspect)))]
 
+                        # plot local FOV
                         ax[c_i, d_i+len(day_slices[ds_i])].imshow(
                             sess.s2p_ops['meanImg'][ybounds[0]:ybounds[1],
                                                     xbounds[0]:xbounds[1]],
-                            cmap='Greys_r',aspect='auto')
+                            cmap='Greys_r',aspect=aspect, )
+                            # vmax=np.percentile(sess.s2p_ops['meanImg'][ybounds[0]:ybounds[1],
+                            #                         xbounds[0]:xbounds[1]].ravel(),99.9) ) #'auto')
                         roi = np.zeros([512,796*sess.n_planes])*np.nan
                         roi[sess.s2p_stats[cell_id_this_day]['ypix'], 
                             sess.s2p_stats[cell_id_this_day]['xpix']]=1
+                # plot ROI shading
                 ax[c_i, d_i+len(day_slices[ds_i])].imshow(
                     roi[ybounds[0]:ybounds[1],
                         xbounds[0]:xbounds[1]],
-                    cmap='cool',alpha=.65) #bwr_r
+                    cmap='cool',alpha=.65, aspect=aspect) #bwr_r
                 ax[c_i, d_i+len(day_slices[ds_i])].set_title(f"day {day}")
                 ax[c_i, d_i+len(day_slices[ds_i])].set_xticks([])
                 ax[c_i, d_i+len(day_slices[ds_i])].set_yticks([])
@@ -671,6 +574,7 @@ for an in an_list:
     else:
         print('no cells of this category and conversion')
         
+                        
 ```
 
 ## LMMs on cell fractions tracked
