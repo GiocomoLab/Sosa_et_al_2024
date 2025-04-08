@@ -675,8 +675,8 @@ def plot_all_single_cells(sess,
             #               , 'g.', markersize=5) for f in field_pos[cellID[cell]]]
 
         # c_ax.set_yticks([])
-
-        c_ax.set_xticks([0, 225, 450])
+        if not circ_shift:
+            c_ax.set_xticks([0, 225, 450])
 
         if label_by_keys is not None:
             c_ax.set_title("%d, %s" % (int(cellID[cell]),
