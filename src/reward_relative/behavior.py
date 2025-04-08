@@ -8,7 +8,7 @@ import warnings
 
 import TwoPUtils
 
-from reward_relative import utilities as ut
+from . import utilities as ut
 from . import plotUtils as pt
 
 reward_zone_dict = {'A': [175, 225],
@@ -37,8 +37,14 @@ env_morph_dict = {'Env1': 0,
 def get_trial_types(sess):
     """
     :param sess: session class
+<<<<<<< Sosa
     :return: isreward, morph, - binary vectors indicating whether reward was delivered
         on each trial, whether the trial was env morph value 0 or 1
+=======
+    :return: isreward, morph, dream - binary vectors indicating whether reward was delivered
+        on each trial, whether the trial was morph 0 or 1, whether the trial was in Dreamland
+        or not.
+>>>>>>> InVivoDA
     """
 
     isreward = np.empty((0, 1), int)
@@ -64,12 +70,12 @@ def get_trial_types(sess):
             # make this not an int if using non-integer morph values
         except:
             morph = np.append(morph, 0)
-        
 
     return isreward, morph
 
 
-def get_reward_zones(sess, rz_dict=None):
+def get_reward_zones(sess, rz_dict=None, change_trial=30):
+
     """
     Get reward zone positions and labels for a given session based on scene.
     :param sess: session class
@@ -89,6 +95,10 @@ def get_reward_zones(sess, rz_dict=None):
     rz_labels = np.chararray(0, unicode=True) #np.array([''])
     rz_coords = np.zeros((N, 2))
 
+    # Check that the change trial matches
+    if hasattr(sess, 'change_reward_trial'):
+        change_trial = sess.change_reward_trial 
+        
     # Set reward zone based on scene ID
     if sess.scene in ['Env1_LocationA', 'Env2_LocationA', 'Env3_LocationA']:
         rz_coords = np.tile(rz_dict['X'], (N, 1))
@@ -99,47 +109,50 @@ def get_reward_zones(sess, rz_dict=None):
     elif sess.scene in ['Env1_LocationC', 'Env2_LocationC', 'Env3_LocationC']:
         rz_coords = np.tile(rz_dict['Z'], (N, 1))
         rz_labels = np.tile('C', (N, 1))
+
     # switch sessions:
     elif 'A_to' in sess.scene and sess.scene[-1] == 'B':
-        rz_coords = np.tile(rz_dict['X'], (30, 1))
-        rz_labels = np.tile('A', (30, 1))
+        rz_coords = np.tile(rz_dict['X'], (change_trial, 1))
+        rz_labels = np.tile('A', (change_trial, 1))
         rz_coords = np.append(rz_coords, np.tile(
-            rz_dict['Y'], (N - 30, 1)), axis=0)
-        rz_labels = np.append(rz_labels, np.tile('B', (N - 30, 1)), axis=0)
+            rz_dict['Y'], (N - change_trial, 1)), axis=0)
+        rz_labels = np.append(rz_labels, np.tile('B', (N - change_trial, 1)), axis=0)
     elif 'B_to' in sess.scene and sess.scene[-1] == 'A':
-        rz_coords = np.tile(rz_dict['Y'], (30, 1))
-        rz_labels = np.tile('B', (30, 1))
+        rz_coords = np.tile(rz_dict['Y'], (change_trial, 1))
+        rz_labels = np.tile('B', (change_trial, 1))
         rz_coords = np.append(rz_coords, np.tile(
-            rz_dict['X'], (N - 30, 1)), axis=0)
-        rz_labels = np.append(rz_labels, np.tile('A', (N - 30, 1)), axis=0)
+            rz_dict['X'], (N - change_trial, 1)), axis=0)
+        rz_labels = np.append(rz_labels, np.tile('A', (N - change_trial, 1)), axis=0)
     elif 'A_to' in sess.scene and sess.scene[-1] == 'C':
-        rz_coords = np.tile(rz_dict['X'], (30, 1))
-        rz_labels = np.tile('A', (30, 1))
+        rz_coords = np.tile(rz_dict['X'], (change_trial, 1))
+        rz_labels = np.tile('A', (change_trial, 1))
         rz_coords = np.append(rz_coords, np.tile(
-            rz_dict['Z'], (N - 30, 1)), axis=0)
-        rz_labels = np.append(rz_labels, np.tile('C', (N - 30, 1)), axis=0)
+            rz_dict['Z'], (N - change_trial, 1)), axis=0)
+        rz_labels = np.append(rz_labels, np.tile('C', (N - change_trial, 1)), axis=0)
     elif 'C_to' in sess.scene and sess.scene[-1] == 'A':
-        rz_coords = np.tile(rz_dict['Z'], (30, 1))
-        rz_labels = np.tile('C', (30, 1))
+        rz_coords = np.tile(rz_dict['Z'], (change_trial, 1))
+        rz_labels = np.tile('C', (change_trial, 1))
         rz_coords = np.append(rz_coords, np.tile(
-            rz_dict['X'], (N - 30, 1)), axis=0)
-        rz_labels = np.append(rz_labels, np.tile('A', (N - 30, 1)), axis=0)
+            rz_dict['X'], (N - change_trial, 1)), axis=0)
+        rz_labels = np.append(rz_labels, np.tile('A', (N - change_trial, 1)), axis=0)
     elif 'B_to' in sess.scene and sess.scene[-1] == 'C':
-        rz_coords = np.tile(rz_dict['Y'], (30, 1))
-        rz_labels = np.tile('B', (30, 1))
+        rz_coords = np.tile(rz_dict['Y'], (change_trial, 1))
+        rz_labels = np.tile('B', (change_trial, 1))
         rz_coords = np.append(rz_coords, np.tile(
-            rz_dict['Z'], (N - 30, 1)), axis=0)
-        rz_labels = np.append(rz_labels, np.tile('C', (N - 30, 1)), axis=0)
+            rz_dict['Z'], (N - change_trial, 1)), axis=0)
+        rz_labels = np.append(rz_labels, np.tile('C', (N - change_trial, 1)), axis=0)
     elif 'C_to' in sess.scene and sess.scene[-1] == 'B':
-        rz_coords = np.tile(rz_dict['Z'], (30, 1))
-        rz_labels = np.tile('C', (30, 1))
+        rz_coords = np.tile(rz_dict['Z'], (change_trial, 1))
+        rz_labels = np.tile('C', (change_trial, 1))
         rz_coords = np.append(rz_coords, np.tile(
-            rz_dict['Y'], (N - 30, 1)), axis=0)
-        rz_labels = np.append(rz_labels, np.tile('B', (N - 30, 1)), axis=0)
+            rz_dict['Y'], (N - change_trial, 1)), axis=0)
+        rz_labels = np.append(rz_labels, np.tile('B', (N - change_trial, 1)), axis=0)
+
             
     elif 'Training' in sess.scene:
         rz_coords = np.tile([275, 325], (N, 1))
         rz_labels = np.tile('T', (N, 1))
+
 
     return rz_coords, rz_labels
 
@@ -163,24 +176,31 @@ def define_trial_subsets(sess, force_two_sets=False):
     """
 
     isreward, morph = get_trial_types(sess)
-    reward_zone, rz_label = get_reward_zones(sess)
+    if hasattr(sess, 'change_reward_trial'):
+        reward_zone, rz_label = get_reward_zones(sess, change_trial = sess.change_reward_trial)
+    else:
+        reward_zone, rz_label = get_reward_zones(sess)
 
     two_sets = True
 
     if ('A_to_B' in sess.scene):
+
         trial_set0 = (rz_label == ['A'])[:, 0]
         trial_set1 = (rz_label == ['B'])[:, 0]
         fig_str = "AvsBtrials"
         label0 = "A trials"
         label1 = "B trials"
-        print("set 0: A trials / set 1: B trials")
+        # print("set 0: A trials / set 1: B trials")
+
     elif  ('B_to_A' in sess.scene):
+
         trial_set0 = (rz_label == ['B'])[:, 0]
         trial_set1 = (rz_label == ['A'])[:, 0]
         fig_str = "BvsAtrials"
         label0 = "B trials"
         label1 = "A trials"
-        print("set 0: B trials / set 1: A trials")
+        # print("set 0: B trials / set 1: A trials")
+
     
     elif sess.scene in ['Env1_LocationA', 'Env2_LocationA', 'Env3_LocationA']:
         fig_str = "Atrials"
@@ -200,6 +220,7 @@ def define_trial_subsets(sess, force_two_sets=False):
             trial_set1 = []
             label0 = "A trials"
             label1 = ''
+
     elif sess.scene in ['Env1_LocationB', 'Env2_LocationB', 'Env3_LocationB']:
         fig_str = "Btrials"
         # print("There is only 1 set")
@@ -248,8 +269,8 @@ def define_trial_subsets(sess, force_two_sets=False):
                 fig_str = f"{zone0}vs{zone1}trials"
                 label0 = f"{zone0} trials"
                 label1 = f"{zone1} trials"
-                print(
-                    f"set 0: {zone0} trials / set 1: {zone1} trials")
+                # print(
+                #     f"set 0: {zone0} trials / set 1: {zone1} trials")
             else:
                 two_sets = False
                 zone0 = zone_id[np.argmin(zone_trial)]
@@ -269,8 +290,8 @@ def define_trial_subsets(sess, force_two_sets=False):
                     label0 = f"{zone0} trials"
                     label1 = ''
                     fig_str = f"{zone0}trials"
-                    print(
-                        f"There is only 1 set: {zone0} trials")
+                    # print(
+                    #     f"There is only 1 set: {zone0} trials")
 
         except:
             raise NotImplementedError(
@@ -293,13 +314,19 @@ def find_trial_blocks(anim_dict, exp_day, define_blocks_by=None, block_len=10):
 
     :param anim_dict: dictionary for a single animal, such as output of multi_anim_sess
     :param exp_day: experiment day (1-indexed)
+<<<<<<< Sosa
     :param define_blocks_by: 'reward_zone','morph', or None
+=======
+    :param define_blocks_by: 'reward_zone','morph','dream', or None
+>>>>>>> InVivoDA
     :return: find_blocks0, find_blocks1: sets of trial indices for each block
     """
 
     if define_blocks_by is not None:
         # then we have 2 types of trials -- split into 10-trial blocks each
+
         if define_blocks_by == 'morph':
+
             sorter = anim_dict[define_blocks_by]
             # find the trial types:
             type0 = np.unique(sorter)[0]
@@ -318,7 +345,9 @@ def find_trial_blocks(anim_dict, exp_day, define_blocks_by=None, block_len=10):
         else:
             raise NotImplementedError("Undefined input to define_blocks_by.")
 
+
         if define_blocks_by == 'reward_zone':
+
             split0 = math.ceil(len(find_set0) / block_len)
             split1 = math.ceil(len(find_set1) / block_len)
             find_blocks0 = np.array_split(find_set0, split0)
@@ -338,7 +367,7 @@ def find_trial_blocks(anim_dict, exp_day, define_blocks_by=None, block_len=10):
 
 def correct_lick_sensor_error(licks_, trial_starts, trial_ends, correction_thr=0.5):
     """
-    Find samples where corroded lick detector got stuck at 1, and set to NaN
+    Find samples where lick detector was putatively stuck at 1, and set to NaN
 
     :param licks_:
     :type licks_:
@@ -355,6 +384,7 @@ def correct_lick_sensor_error(licks_, trial_starts, trial_ends, correction_thr=0
     error_count = 0
     for t_start, t_end in zip(trial_starts, trial_ends):
         # if >correction_thr (fraction) of samples have a cumulative lick count of >2
+
         if sum(licks[t_start:t_end] > 2)/len(licks[t_start:t_end]) > correction_thr:
             licks[t_start:t_end] = np.nan
             # print(f'setting trial {np.where(trial_starts==t_start)[0]} to NaN')
@@ -461,7 +491,15 @@ def plot_norm_lick_raster(sess,
         morph = np.zeros(ntrials, )
 
     # find reward zone coordinates
-    rz, rzL = get_reward_zones(sess)
+    if rzone_labels is not None:
+        if hasattr(sess, 'change_reward_trial'):
+            rz, _ = get_reward_zones(sess, change_trial = sess.change_reward_trial)
+            # change_trial = np.where(rzone_labels != rzone_labels[0])[0][0]
+            # rz, _ = get_reward_zones(sess, change_trial=change_trial)
+        else:
+            rz, _ = get_reward_zones(sess)  
+    else:
+        rz, rzone_labels = get_reward_zones(sess)
 
     # optional sort by omission trials
     if sort_by is not None:
@@ -472,6 +510,7 @@ def plot_norm_lick_raster(sess,
                          ax, plottype='area', morph=morph,rzone_labels=rzone_labels)
     else:
         plot_reward_zone(rz, ax, plottype='area', morph=morph,  rzone_labels=rzone_labels)
+
 
     if trial_subset is not None:
         smooth_raster(sess.trial_matrices[key][-1], norm_licks[trial_subset, :],
@@ -485,7 +524,8 @@ def plot_norm_lick_raster(sess,
     ax.spines['right'].set_visible(False)
     ax.set_xlim([sess.trial_matrices[key][-2][0], sess.trial_matrices[key][-2][-1]])
     ax.set_xticks(np.arange(0,sess.trial_matrices[key][-2][-1]+50, 50))
-    ax.set_ylim(top=isreward.shape[0], bottom=0)
+    ax.set_ylim(top=ntrials, bottom=0) 
+
     ax.set_xlabel('position')
     ax.set_ylabel('trials')
     ax.set_title('licks')
@@ -543,7 +583,15 @@ def plot_norm_speed_raster(sess, ax=None, sort_by=None, isreward=None, morph=Non
         morph = np.zeros(ntrials, )
 
     # find reward zone coordinates
-    rz, _ = get_reward_zones(sess)
+    if rzone_labels is not None:
+        if hasattr(sess, 'change_reward_trial'):
+            rz, _ = get_reward_zones(sess, change_trial = sess.change_reward_trial)
+            # change_trial = np.where(rzone_labels != rzone_labels[0])[0][0]
+            # rz, _ = get_reward_zones(sess, change_trial=change_trial)
+        else:
+            rz, _ = get_reward_zones(sess)  
+    else:
+        rz, rzone_labels = get_reward_zones(sess)
 
     # optional sort by omission trials
     if sort_by is not None:
@@ -552,6 +600,7 @@ def plot_norm_speed_raster(sess, ax=None, sort_by=None, isreward=None, morph=Non
                          ax, plottype='area', morph=morph, rzone_labels=rzone_labels)
     else:
         plot_reward_zone(rz, ax, plottype='area', morph=morph, rzone_labels=rzone_labels)
+
 
     if trial_subset is not None:
         smooth_raster(sess.trial_matrices['speed'][-1], norm_speed[trial_subset, :],
@@ -606,6 +655,7 @@ def smooth_raster(x, mat, ax=None, smooth=False, sig=2, vals=None, cmap=None, co
         mat[mat == 0] = np.nan
 
     for ind, i in enumerate(np.arange(mat.shape[0]-1, -1, -1)):
+
         if vals is not None:
             ax.fill_between(x, mat[ind, :] + i, y2=i,
                             color=cm(np.float(vals[ind])), linewidth=.001)
@@ -631,7 +681,7 @@ def plot_reward_zone(reward_zone, ax=None, plottype=None,
                      morph0color=(0, 0.8, 1, 0.3),
                      morph1color=(1, 0.1, 0.3, 0.3),
                      morph=np.array([]),
-                    rzone_labels=None):
+                     rzone_labels=None):
     """
     plot reward_zone as either shaded area or white lines
 
@@ -640,7 +690,13 @@ def plot_reward_zone(reward_zone, ax=None, plottype=None,
     :param plottype: 'area' (default; for smoothed rasters) or 'line' (for imshow-style plots)
     :param morph0color: color of reward_zone shading on morph0 track (used as default)
     :param morph1color: color of reward_zone shading on morph1 track
+<<<<<<< Sosa
     :param morph: trials x 1 array of morph values, expected as binary 1s and 0s
+=======
+    :param dreamcolor: color of reward_zone shading on DreamLand track
+    :param morph: trials x 1 array of morph values, expected as binary 1s and 0s
+    :param dream: trials x 1 array of dream values, expected as binary 1s and 0s
+>>>>>>> InVivoDA
     :return: ax - axis of plot object
     """
     if ax is None:
@@ -654,6 +710,7 @@ def plot_reward_zone(reward_zone, ax=None, plottype=None,
         if rzone_labels is not None:
             rzone_labels = np.flipud(rzone_labels)
         morph = np.flipud(morph)
+
     else:
         plot_reward = reward_zone
 
@@ -672,7 +729,9 @@ def plot_reward_zone(reward_zone, ax=None, plottype=None,
         if plottype == 'line':
             ax.vlines(rstart / 10, tstart, tend, colors='white')
         elif plottype == None or plottype == 'area':
+
             if sum(morph) != 0 and rzone_labels is None:
+
                 if int(morph[tstart]) == 0:
                     ax.fill_betweenx([tstart, tend], [rstart, rstart], [
                                      rend, rend], color=morph0color)
@@ -845,7 +904,11 @@ def calc_lick_metrics(sess,
 
     frame_time = frametime(sess)
 
-    reward_zone, _ = get_reward_zones(sess)
+    if hasattr(sess, 'change_reward_trial'):
+        reward_zone, _ = get_reward_zones(sess, change_trial = sess.change_reward_trial)
+    else:
+        reward_zone, _ = get_reward_zones(sess)
+
 
     mean_licks, sem_licks, lickmat = lickrate_PETH(licks,
                                                    rawpos,
@@ -857,7 +920,6 @@ def calc_lick_metrics(sess,
                                                    correct_sensor_error=correct_sensor_error,
                                                    correction_thr=correction_thr,
                                                   zscore=zscore)
-
 
     # lick slope in anticipatory zone (50 cm prior to rzone)
     ant = mean_licks[np.logical_and(
@@ -961,17 +1023,6 @@ def antic_consum_licks(sess):
 
     nonconsum_speed = np.copy(sess.vr_data['dz']._values)
     nonconsum_speed[consum_mask] = np.nan
-
-    # sess.add_timeseries(antic_licks=antic_licks,
-    #                     licks=sess.vr_data['lick']._values,
-    #                     speed=sess.vr_data['dz']._values,
-    #                     antic_speed=nonconsum_speed)
-    # sess.add_pos_binned_trial_matrix(('antic_licks', 'speed', 'antic_speed'), 't', mat_only=True)
-
-    # antic_lick_positions = np.zeros(sess.timeseries['licks'].shape) * np.nan
-    # antic_lick_mask = antic_licks > 0
-    # antic_lick_positions[antic_lick_mask] = sess.vr_data['pos']._values[antic_lick_mask.ravel()]
-    # sess.add_timeseries(antic_lick_positions=antic_lick_positions)
 
     return antic_licks
 

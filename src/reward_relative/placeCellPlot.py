@@ -654,11 +654,11 @@ def plot_all_single_cells(sess,
                         if circ_shift:
                             f = circ.wrap(spatial.pos_cm_to_rad(
                                 f, max_pos, min_pos) + circ.wrap(spatial.pos_cm_to_rad(
-                                rzone0[0], max_pos, min_pos=min_pos
-                                
-                            ) - spatial.pos_cm_to_rad(rzone1[0], max_pos, min_pos=min_pos
-                                                                                                                 
-                                                     )))
+                                    rzone0[0], max_pos, min_pos=min_pos
+
+                                ) - spatial.pos_cm_to_rad(rzone1[0], max_pos, min_pos=min_pos
+
+                                                          )))
 
                         c_ax.plot(f,
                                   np.zeros((len(f),))-2,
@@ -675,7 +675,9 @@ def plot_all_single_cells(sess,
             #               , 'g.', markersize=5) for f in field_pos[cellID[cell]]]
 
         # c_ax.set_yticks([])
-        # c_ax.set_xticks([])
+        if not circ_shift:
+            c_ax.set_xticks([0, 225, 450])
+
         if label_by_keys is not None:
             c_ax.set_title("%d, %s" % (int(cellID[cell]),
                                        [f'{use_metrics[key][cellID[cell]]:.2f}' for key in label_by_keys]))
@@ -700,6 +702,7 @@ def plot_single_cells_w_similarity_matrix(an,
                                           sigma=1,
                                           circ_shift=False,
                                           use_speed_thr=True,
+                                          max_cells=None,
                                           sim_method='correlation',
                                           max_pos=450,
                                           min_pos=0,
@@ -723,6 +726,7 @@ def plot_single_cells_w_similarity_matrix(an,
                         ['sess'].vr_data['speed'].values)
     else:
         speed = None
+    
 
     figtag = ''
     if circ_shift:
@@ -804,6 +808,11 @@ def plot_single_cells_w_similarity_matrix(an,
         pc_masks[cell_mask] = True
     else:
         pc_masks = cell_mask
+        
+    if max_cells is None:
+        max_cells = pc_masks.sum()
+    else:
+        max_cells = np.min([max_cells, pc_masks.sum()])
 
     cell_sim_mat = dict()
 
@@ -821,11 +830,12 @@ def plot_single_cells_w_similarity_matrix(an,
 
     # ---- Plot single cell place fields and trial-by-trial similarity matrices ----
 
-    cell_range = [0, pc_masks.sum()]
+    cell_range = [0, max_cells]
 
     xstride = 3
     ystride = 3
     nperrow = 8
+    
     fig = plt.figure(figsize=[nperrow * xstride,
                               cell_range[-1] / nperrow * ystride])
     gs = gridspec.GridSpec(
@@ -1265,12 +1275,12 @@ def plot_sequences(_multiDayData,
                     max_pos = _multiDayData[d].activity_matrix[an][-2][-1]
                     min_pos = _multiDayData[d].activity_matrix[an][-2][0]
                 else:
-                    max_pos = _multiDayData[d].pos_bin_centers[an][-1] + \
+                    max_pos = _multiDayData[d].pos_bin_centers[-1] + \
                         np.mean(
-                            np.diff(_multiDayData[d].pos_bin_centers[an]))/2
-                    min_pos = _multiDayData[d].pos_bin_centers[an][0] - \
+                            np.diff(_multiDayData[d].pos_bin_centers))/2
+                    min_pos = _multiDayData[d].pos_bin_centers[0] - \
                         np.mean(
-                            np.diff(_multiDayData[d].pos_bin_centers[an]))/2
+                            np.diff(_multiDayData[d].pos_bin_centers))/2
 
                 # find the mean of the session per cell for normalization
                 norm_per_cell = np.nanmean(np.nanmean(
@@ -1289,9 +1299,10 @@ def plot_sequences(_multiDayData,
                 else:
                     if celltype == 'rr':
                         keep = _multiDayData[d].reward_rel_cell_ids[an]
-                    elif celltype == 'stable':
+                    elif celltype == 'track':
                         keep = np.where(
-                            _multiDayData[d].cell_class[an]['masks']['stable'])[0]
+                            _multiDayData[d].cell_class[an]['masks']['track'])[0]
+                    elif celltype == 'appear':
                         keep = np.where(
                             _multiDayData[d].cell_class[an]['masks']['appear'])[0]
                     elif celltype == 'disappear':
@@ -1300,20 +1311,18 @@ def plot_sequences(_multiDayData,
                     elif celltype == 'nonreward_remap':
                         keep = np.where(
                             _multiDayData[d].cell_class[an]['masks']['nonreward_remap'])[0]
-                    elif celltype == 'unstable':
-                        keep = np.where((_multiDayData[d].cell_class[an]['masks']['appear'] |
-                                         _multiDayData[d].cell_class[an]['masks']['disappear'] |
-                                         _multiDayData[d].cell_class[an]['masks']['nonreward_remap']
-                                         ))[0]
+                    else:
+                        raise NotImplementedError("This cell type is not defined")
+                        
                     if celltype != 'rr':
                         # exclude cells that also qualified as RR
-                        print(
-                            f'how many {celltype} were also RR? {np.sum(np.isin(keep, _multiDayData[d].reward_rel_cell_ids[an]))}')
+                        # print(
+                        #     f'how many {celltype} were also RR? {np.sum(np.isin(keep, _multiDayData[d].reward_rel_cell_ids[an]))}')
                         keep = keep[~np.isin(
                             keep, _multiDayData[d].reward_rel_cell_ids[an])]
 
                 if exc_end_cells:
-                    pos = _multiDayData[d].pos_bin_centers[an]
+                    pos = _multiDayData[d].pos_bin_centers
                     print(
                         'excluding end cells assuming first and last bin are the ends')
                     end_cells = np.logical_or(
@@ -1606,6 +1615,6 @@ def plot_sequences(_multiDayData,
             )
 
     if plot:
-        return seq, fig, fig_q
+        return seq, seq_df, fig, fig_q
     else:
-        return seq, [], []
+        return seq, seq_df, [], []

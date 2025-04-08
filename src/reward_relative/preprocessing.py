@@ -1,7 +1,5 @@
 import numpy as np
 import scipy as sp
-# import scipy.io as spio
-# import sqlite3 as sql
 import pandas as pd
 from datetime import datetime
 from glob import glob
@@ -12,12 +10,9 @@ from sklearn.linear_model import LinearRegression as linreg
 import TwoPUtils
 import TwoPUtils.utilities as u
 from TwoPUtils.utilities import nansmooth
+
 from . import utilities as ut
-
-# from suite2p.io.binary import BinaryFile
 from suite2p.extraction import dcnv
-# from PIL import Image
-
 
 def create_sess(basedir, scandir, vrdir, animal, date, scene, session, scan_number,
                 load_scaninfo=True,
@@ -27,6 +22,7 @@ def create_sess(basedir, scandir, vrdir, animal, date, scene, session, scan_numb
                 VR_only=False,
                 nplanes=1,
                 scanner="NLW",
+                sbx_version=2,
                 **trial_matrix_kwargs):
     """
     Wrapper to create sess class using TwoPUtils and add behavior data
@@ -57,8 +53,16 @@ def create_sess(basedir, scandir, vrdir, animal, date, scene, session, scan_numb
             else:
                 scan_header, scan_file = fullpath+'.mat', fullpath+'.sbx'
 
-            scan_info = TwoPUtils.scanner_tools.sbx_utils.loadmat(scan_header)
-            n_planes = scan_info['n_planes']  # len(glob(planedir))
+            scan_info = TwoPUtils.scanner_tools.sbx_utils.loadmat(
+                scan_header, sbx_version=sbx_version)
+            if 'n_planes' in scan_info.keys():
+                n_planes = scan_info['n_planes']  # len(glob(planedir))
+            else:
+                print(scan_info['etl_table'])
+                warnings.warn(
+                    "n_planes not yet implemented for scanbox 3, defaulting to 1!")
+                n_planes = 1
+
             print(f"Found {n_planes} planes from scan info")
 
         elif scanner == "ThorLabs":
@@ -66,8 +70,8 @@ def create_sess(basedir, scandir, vrdir, animal, date, scene, session, scan_numb
                 basedir, date, "%s_%03d_%03d" % (scene, session, scan_number))
             scanpath = os.path.join(
                 basedir, date, "%s_%03d_%03d" % (scene, session, scan_number))
-
             scan_file = glob(os.path.join(fullpath, 'Image_scan*.tif'))[0]
+
             scan_header = os.path.join(fullpath, "Experiment.xml")
 
             # find number of planes from suite2p dir
@@ -119,12 +123,14 @@ def create_sess(basedir, scandir, vrdir, animal, date, scene, session, scan_numb
                         VR=load_VR,
                         suite2p=load_suite2p,
                         behavior=load_behavior,
+                        sbx_version=sbx_version,
                         **trial_matrix_kwargs)
 
     return sess
 
 
 def append_session_data(sess, scaninfo=False, VR=False, suite2p=False, behavior=False,
+                        sbx_version=2,
                         **trial_matrix_kwargs):
     """
     complete the session class with relevant data
@@ -141,7 +147,8 @@ def append_session_data(sess, scaninfo=False, VR=False, suite2p=False, behavior=
     """
 
     if scaninfo:
-        sess.load_scan_info()
+        sess.load_scan_info(sbx_version=sbx_version)
+
     if VR:
         sess.align_VR_to_2P()
     print(sess.vr_data.shape)
@@ -172,7 +179,8 @@ def vr_align_to_mock_2P(vr_dataframe, scan_info, run_ttl_check=False, n_planes=1
     For use when no imaging session accompanies the VR data.
     Basically downsamples the VR data to the 2P framerate.
 
-    For aligning to actual 2P data, use TwoPUtils.preprocessing.vr_align_to_2P
+    !! For aligning to actual 2P data, use TwoPUtils.preprocessing.vr_align_to_2P !!
+    https://github.com/GiocomoLab/TwoPUtils/tree/main
     """
 
     fr = scan_info['frame_rate']  # frame rate
@@ -278,23 +286,23 @@ def vr_align_to_mock_2P(vr_dataframe, scan_info, run_ttl_check=False, n_planes=1
 
 
 
-def dff(f,  
-        trial_starts, 
-        teleports, 
-        f_neu=None, 
-        regress_ts=None, 
-        neuropil_method=None, 
+def dff(f,
+        trial_starts,
+        teleports,
+        f_neu=None,
+        regress_ts=None,
+        neuropil_method=None,
         bleedthrough_ts=None,
         neu_bleedthrough_ts=None,
-        baseline_method='maximin', 
-        subtract_baseline=True, 
-        scrub_ts=None, 
+        baseline_method='maximin',
+        subtract_baseline=True,
+        scrub_ts=None,
         scrub_th=5,
-        neu_coef=0.7, 
-        tau=0.7, 
-        frame_rate=15, 
-        n_planes=1, 
-        deconvolve=False, 
+        neu_coef=0.7,
+        tau=0.7,
+        frame_rate=15,
+        n_planes=1,
+        deconvolve=False,
         keep_teleports=False):
     """
     Calculate dFF for 1 channel
@@ -378,6 +386,7 @@ def dff(f,
             lr.predict(regress_ts[:, nanmask].T).T + \
             lr.intercept_[:, np.newaxis]
 
+
     if scrub_ts is not None:
         scrub_mask = scrub_ts >= scrub_th
         f_[:, scrub_mask] = np.nan
@@ -426,9 +435,10 @@ def dff(f,
                 f_neu_[:, start-1:stop-1], axis=1, keepdims=True)
 
         if baseline_method == 'maximin':
+            # cut out ITIs and smooth signal
             flow[:, start - 1:stop -
-                 1] = ut.nansmooth(f_[:, start-1:stop-1], [0, 15])
-            # [0., 30])  # cut out ITIs and smooth signal
+                 1] = nansmooth(f_[:, start-1:stop-1], [0, 15])
+            
             # minimum filter, taking min val over 20 sec
             flow[:, start-1:stop-1] = sp.ndimage.filters.minimum_filter1d(
                 flow[:, start-1:stop-1], int(300), axis=-1)
@@ -436,7 +446,7 @@ def dff(f,
                 flow[:, start-1:stop-1], int(300), axis=-1)  # max filter with same window (dilation)
         elif baseline_method == 'maxsmooth':
             flow[:, start-1:stop -
-                 1] = ut.nansmooth(f_[:, start-1:stop-1], [0, stop-start])
+                 1] = nansmooth(f_[:, start-1:stop-1], [0, stop-start])
         else:
             print('Undefined baseline_method')
             raise NotImplementedError
@@ -467,6 +477,4 @@ def dff(f,
         return dff, spks
     else:
         return dff
-
-
 
