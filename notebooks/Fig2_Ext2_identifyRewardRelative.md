@@ -88,41 +88,24 @@ exp_days = [3, 5, 7, 8, 10, 12, 14]
 
 max_anim_list = dd.max_anim_list(experiment, exp_days, year=year)
 
-bin_size = 10  # for quantifying distribution of place field peak locations
-sigma = 1  # for smoothing
-smooth = False  # whether to smooth for finding place cell peaks
-exclude_int = True  # exclude putative interneurons
-int_thresh = 0.5
-# whether to impute (interpolate) bins that are NaN in spatially-binned data
-impute_NaNs = True
+## These parameters were used for computing the saved multiDayData
+# bin_size = 10  # for quantifying distribution of place field peak locations
+# sigma = 1  # for smoothing
+# smooth = False  # whether to smooth for finding place cell peaks
+# exclude_int = True  # exclude putative interneurons
+# int_thresh = 0.5
 
-# Place cell definitions:
-# 'and' = must have significant spatial information
-# in trial set 0 AND trial set 1 (i.e. before and after the reward switch)
-# 'or' = must have signitive spatial information in trial set 0 OR trial set 1
-place_cell_logical = 'or'
+## Place cell definitions:
+## 'and' = must have significant spatial information
+## in trial set 0 AND trial set 1 (i.e. before and after the reward switch)
+## 'or' = must have signitive spatial information in trial set 0 OR trial set 1
+# place_cell_logical = 'or'
 ts_key = 'dff'  # which timeseries to use for finding peaks
-use_speed_thr = True  # use a speed threshold to calculate new trial matrices
-# speed threshold in cm/s (excludes data at speed less than this)
-speed_thr = 2
+# use_speed_thr = True  # use a speed threshold to calculate new trial matrices
+# # speed threshold in cm/s (excludes data at speed less than this)
+# speed_thr = 2
 
 reward_dist_inclusive = 50  # in cm
-
-# create a tag to label the filename with params
-tag = ''
-if smooth:
-    tag = ('smoothed_sig%d' % sigma)
-else:
-    tag = 'unsmoothed'
-
-if exclude_int:
-    tag = tag + ('_excInt%.1f' % int_thresh)
-
-tag = tag + ('_inc%d' % reward_dist_inclusive)
-
-if use_speed_thr:
-    tag = tag + '_useSpeed'
-ts_key = 'dff'  # used to find place field peaks
 
 # datetime of saved file
 dt = "202504"
@@ -1219,11 +1202,11 @@ sig_r_vals_TR = all_p_vals_TR < .05
 fig, ax = plt.subplots(3,4,figsize=(12,4), sharey='col')
 
 # stats for RR cells, compared to TR and nonRR
-U_TR, p_TR = sp.stats.ranksums(all_r_vals_RR[all_is_rr],all_r_vals_RR[all_is_track])
-U_NR, p_NR = sp.stats.ranksums(all_r_vals_RR[all_is_rr],all_r_vals_RR[all_is_nonrrr])
+Z_TR, p_TR = sp.stats.ranksums(all_r_vals_RR[all_is_rr],all_r_vals_RR[all_is_track])
+Z_NR, p_NR = sp.stats.ranksums(all_r_vals_RR[all_is_rr],all_r_vals_RR[all_is_nonrrr])
 pt.histogram(all_r_vals_RR[all_is_rr], ax=ax[0,0], bins=np.arange(-1,1.05,0.05), plot=True, 
-             label='RR n=%d, circ, \n U_TR, p_TR = %.1f, %.3e \n U_NR, p_NR = %.1f, %.3e' % (
-             np.sum(all_is_rr), U_TR, p_TR, U_NR, p_NR),
+             label='RR n=%d, circ, \n Z_TR, p_TR = %.1f, %.3e \n Z_NR, p_NR = %.1f, %.3e' % (
+             np.sum(all_is_rr), Z_TR, p_TR, Z_NR, p_NR),
              facecolor='orange',
              edgecolor = 'none'
             )
@@ -1237,14 +1220,14 @@ pt.histogram(all_r_vals_RR[all_is_nonrrr], ax=ax[2,0], bins=np.arange(-1,1.05,0.
             edgecolor = 'none')
 
 # stats for TR cells, compared to RR and nonRR
-U_RRt, p_RRt = sp.stats.ranksums(all_r_vals_TR[all_is_rr],all_r_vals_TR[all_is_track])
-U_NRt, p_NRt = sp.stats.ranksums(all_r_vals_TR[all_is_rr],all_r_vals_TR[all_is_nonrrr])
+Z_RRt, p_RRt = sp.stats.ranksums(all_r_vals_TR[all_is_rr],all_r_vals_TR[all_is_track])
+Z_NRt, p_NRt = sp.stats.ranksums(all_r_vals_TR[all_is_rr],all_r_vals_TR[all_is_nonrrr])
 pt.histogram(all_r_vals_TR[all_is_rr], ax=ax[0,2], bins=np.arange(-1,1.05,0.05),label='rr, lin',
              facecolor='orange',
             edgecolor = 'none')
 pt.histogram(all_r_vals_TR[all_is_track], ax=ax[1,2], bins=np.arange(-1,1.05,0.05),
-            label='TR n=%d, lin, \n U_RR, p_RR = %.1f, %.3e \n U_NR, p_NR = %.1f, %.3e' % (
-             np.sum(all_is_track), U_RRt, p_RRt, U_NRt, p_NRt),
+            label='TR n=%d, lin, \n Z_RR, p_RR = %.1f, %.3e \n Z_NR, p_NR = %.1f, %.3e' % (
+             np.sum(all_is_track), Z_RRt, p_RRt, Z_NRt, p_NRt),
              facecolor='black',
              edgecolor = 'none'
             )

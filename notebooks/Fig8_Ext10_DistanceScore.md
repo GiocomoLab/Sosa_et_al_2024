@@ -138,14 +138,17 @@ from scipy.spatial.distance import pdist, squareform
 
 ## Run Kmeans and Distance Score
 
+Takes ~9-10 hours to run through the whole dataset.
+
+NOTE: There is some stochasticity each time this model runs.
+
 ```python
 include_ans = multiDayData[exp_days[0]].circ_rel_stats_across_an['include_ans']
 # use Isabel distance score from PV corr matrix
 # separately calc PV corr mat for RR cells
 dist_score = {}
 cell_masks = {}
-ct_keys = ['RR', 'TR', 'nonRR', 'appear', 'all']
-ct = 'RR'
+ct_keys = ['RR', 'nonRR', 'appear']
 
 max_k = 2  # set max k to examine for optimal clustering
 # ^we expect 2 maps, pre- and post-switch. Eliminating sessions that have more than
@@ -458,18 +461,19 @@ for day in [3, 7]:  # dist_score.keys():
             h0 = ax[0, an_i].pcolormesh(
                 Y_sim, shading='auto', vmax=0.7, cmap='cividis')
 
-            ax[0, an_i].set_title(
-                f"k={dist_score[day][an]['pv'][ct]['k']}, one_map={dist_score[day][an]['pv'][ct]['one_map'][0]}")
+            ax[0, an_i].set_title(f"m{ut.get_mouse_number(an)} pv \n  \
+                k={dist_score[day][an]['pv'][ct]['k']}, {not bool(dist_score[day][an]['pv'][ct]['one_map'][0])}")
 
             # sim mat for licks; lick mat
             h1 = ax[1, an_i].pcolormesh(
                 lick_sim, shading='auto',  vmax=1, cmap='cividis')
-
+            ax[1, an_i].set_title('lick')
             # sim mat for licks; lick mat
             h2 = ax[3, an_i].pcolormesh(
                 speed_sim, shading='auto', vmax=1, cmap='cividis')
-            pt.colorbar(h0), pt.colorbar(h1), pt.colorbar(h2), pt.colorbar(h4)
-
+            pt.colorbar(h0), pt.colorbar(h1), pt.colorbar(h2)
+            ax[3, an_i].set_title('speed')
+            
             [ax[i, an_i].axis('square') for i in [0, 1, 3]]
             [ax[i, an_i].invert_yaxis() for i in [0, 1, 3]]
 
@@ -518,7 +522,7 @@ for day in [3, 7]:  # dist_score.keys():
                                                                          [an]['speed']['remap_trial']],
                                  '.', color='forestgreen', markersize=8)
 
-            ax[0, an_i].set_title("m%s" % ut.get_mouse_number(an))
+            
 
         save_figures = False
         if save_figures:
@@ -622,7 +626,7 @@ appear_df = appear_df[(appear_df['ct']=='appear')]
 
 ct_df = sigmoid_df[['mouse','day','switch','ct','sess_id','switch_dir','datatype','remap_trial']]
 ct_df = ct_df[ct_df['datatype']=='pv']
-ct_df
+# ct_df
 ```
 
 ```python
@@ -715,17 +719,11 @@ lmm_ct.pvalues[1:-1]
 ```python
 # multiple comparison correction for fixed effect pvalues:
 pvals = lmm_ct.pvalues[1:-1].values
-from statsmodels.stats.multitest import multipletests
 _, adj_pvals, _, _ = multipletests(pvals, method='fdr_bh')
 
-adj_pvals
-```
-
-```python
 ser = pd.concat([pd.Series(lmm_ct.fe_params[1:].values), pd.Series(adj_pvals)], axis=1) #, index=lmm_ct.fe_params[1:].index)
 ser['fe'] = lmm_ct.fe_params[1:].index
 ser
-# pd.DataFrame(data=ser, columns=['coef','pval'], index=lmm_ct.fe_params[1:].index)
 ```
 
 ```python
@@ -756,6 +754,9 @@ def assess_model_fit(m_full):
 ct = 'RR' # 'RR', 'nonRR', 'appear'
 use_df = sigmoid_df[(sigmoid_df['ct']==ct)]
 
+# Note groups are 'mouse' instead of 'sess_id' as the session id is
+# already accounted for by including 'switch' as a continuous fixed effect
+
 lmm = smf.mixedlm('remap_trial ~ 1 + C(datatype,Treatment("pv"))*C(switch_dir) + switch', groups='mouse', # 
                    re_formula = '~1', 
                   data=use_df,
@@ -768,26 +769,26 @@ print(lmm.summary(), lmm.wald_test_terms(), lmm.pvalues)
 m_full = smf.mixedlm('remap_trial ~ 1 + C(datatype,Treatment("pv"))*C(switch_dir)*switch', groups='mouse',
                    re_formula='1', 
                    data=use_df).fit(reml=False)
-m_null = smf.mixedlm('remap_trial ~ 1 + C(datatype,Treatment("pv"))*C(switch_dir)', groups='mouse',
+m_null = smf.mixedlm('remap_trial ~ 1 + C(datatype,Treatment("pv"))*C(switch_dir) + 1', groups='mouse',
                    re_formula='1', 
                    data=use_df).fit(reml=False)
 
-likelihood_ratio_test(m_full, m_null)
-print(assess_model_fit(m_full))
-print(assess_model_fit(m_null))
+# likelihood_ratio_test(m_full, m_null)
+# print(assess_model_fit(m_full))
+# print(assess_model_fit(m_null))
 
 # no effect of switch day, can get rid of it here
 print("--backward - ref licking --")
 lmm_back = smf.mixedlm('remap_trial ~ 1 + C(datatype,Treatment("lick"))', groups='mouse', re_formula = '~1', 
                   data=use_df[use_df['switch_dir']=='backward'],
                   missing='drop').fit(reml=True)
-print(lmm_back.summary(), lmm_back.wald_test_terms())
+print(lmm_back.summary())
 
 print("--forward - ref licking --")
 lmm_for = smf.mixedlm('remap_trial ~ 1 + C(datatype,Treatment("lick"))', groups='mouse', re_formula = '~1', 
                   data=use_df[use_df['switch_dir']=='forward'],
                   missing='drop').fit(reml=True)
-
+print(lmm_for.summary())
 
 
 ```
@@ -934,11 +935,7 @@ forward_df = sigmoid_df[(sigmoid_df['switch_dir']=='forward') & (sigmoid_df['dat
 backward_df = sigmoid_df[(sigmoid_df['switch_dir']=='backward') & (sigmoid_df['datatype']=='pv') & (sigmoid_df['ct']=='RR')]
 n_forward_sess = int(len(forward_df))
 n_backward_sess = int(len(backward_df))
-forward_df
-```
-
-```python
-len(forward_df), len(backward_df)
+# forward_df
 ```
 
 ```python
