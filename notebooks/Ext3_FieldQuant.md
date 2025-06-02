@@ -17,42 +17,34 @@ jupyter:
 
 ```python tags=[]
 %matplotlib inline
-# inline, widget
+%load_ext autoreload
+%autoreload 2
 
 import math
 import sys
 import os
-import glob
 import pickle
 import dill
 import numpy as np
 import scipy as sp
 import pandas as pd
 import warnings
-from tqdm import tqdm
-import itertools
 import copy
-import astropy
-from astropy import stats
 import phase_precession.core as ppcore
 from datetime import datetime
 
 from matplotlib import pyplot as plt
-from matplotlib import gridspec, cm
 import statsmodels.formula.api as smf
 import seaborn as sns
 sns.set_style("white")
 
 from reward_relative import behavior as behav
-from reward_relative import preprocessing as pp
 from reward_relative import utilities as ut
 from reward_relative import plotUtils as pt
-from reward_relative import xcorr as xc
 from reward_relative import spatial
 from reward_relative import placeCellPlot
 from reward_relative import dayData as dd
 from reward_relative import circ
-from reward_relative import rewardAnalysis as ra
 from reward_relative import regression
     
 import TwoPUtils
@@ -61,15 +53,11 @@ import sklearn
 from sklearn.impute import KNNImputer
 
 
-%load_ext autoreload
-%autoreload 2
-
 save_figures = False
 ```
 
 ```python
 from reward_relative.path_dict_firebird import path_dictionary as path_dict
-# options: path_dict_josquin, path_dict_msosamac, path_dict_msosaexternal
 ```
 
 ```python
@@ -95,7 +83,7 @@ max_anim_list = dd.max_anim_list(experiment,exp_days, year='combined')
 ts_key = 'dff' # used to find place field peaks
 
     
-dt = "202504" #"20240530-1141"
+dt = "202504"
 
 pkl_name = "m%s-%s_expdays%s_multiDayData_%s_%s.pickle" % (ut.get_mouse_number(max_anim_list[0]),
                                                            ut.get_mouse_number(
@@ -141,9 +129,10 @@ def find_sig_active_fields(sess,
                            sigma=1,
                            speed_thr=2,
                            n_shuf=100):
-    
     ''' 
     Find significantly active fields per cell
+
+    This function does most of the heavy lifting for this notebook
     '''
 
     # Get the trial-by-trial activity, at speeds > speed_thr
@@ -194,18 +183,10 @@ def find_sig_active_fields(sess,
     rzone = {'0': rzone_pos[0][0],
              '1': rzone_pos[-1][0]
              }
-    # Limit fields to those with activity over mean + 1 sd for at least 10 trials
 
     trial_mat = np.copy(tm[0])
     if smooth_for_field:
         trial_mat = ut.nansmooth(trial_mat, 1, axis=1)
-
-    lick_trial_mat = np.copy(sess.trial_matrices['licks'][0])
-    lick_trial_mat[np.isnan(lick_trial_mat)] = 0
-    speed_trial_mat = np.copy(sess.trial_matrices['speed'][0])
-    from sklearn.impute import KNNImputer
-    imputer = KNNImputer(n_neighbors=3)
-    speed_trial_mat = imputer.fit_transform(speed_trial_mat)
 
     pos = tm[-1]
 
@@ -230,14 +211,13 @@ def find_sig_active_fields(sess,
                         s]['field_coms_per_trial'] = dict([(c, {}) for c in cell_ids])
         keep_field_dict['set ' +
                         s]['field_rel_coms_per_trial'] = dict([(c, {}) for c in cell_ids])
-        
+
         if s == '0':
             trial_mask_for_field = trial_set0_mask
         elif s == '1':
             trial_mask_for_field = trial_set1_mask
         trial_mask_full = trial_dict['trial_set'+s]
-            
-            
+
     # COM of unbinned sig. deconvolved activity per trial
     keep_field_dict['raw_COM'] = {}
     keep_field_dict['set 1']['formation_lap'] = dict(
@@ -284,7 +264,7 @@ def find_sig_active_fields(sess,
                                               ) + np.nanstd(trial_mat[trial_mask_full, :, cell].ravel())
                                    )
 
-            # find positions on each trial where deconvolved activity is significant
+            # find positions on each trial where deconvolved activity is significant (> activity_thr)
             for t_i, t in enumerate(np.where(trial_mask_full)[0]):
                 t_start = sess.trial_start_inds[t]
                 t_end = sess.teleport_inds[t]
@@ -340,7 +320,7 @@ def find_sig_active_fields(sess,
                     keep_field_dict['set '+s]['field_rel_coms_per_trial'][cell][kf] = np.zeros(
                         (np.sum(trial_mask_full),))*np.nan
 
-            # Now iterate through trials, and for each field that we kept, find the corresponding
+            # Now iterate through trials, and for each average field that we kept, find the corresponding
             # field on each trial and its center of mass
 
             # array to store a count at each position bin for whether the field was active on each trial
@@ -366,7 +346,7 @@ def find_sig_active_fields(sess,
                 for f_i, fpos in enumerate(keep_field_dict['set '+s]['pos'][cell]):
 
                     if s == '1':
-                        
+
                         # allow 10 cm wiggle room from field boundaries
                         field_start = fpos[0] - 10
                         field_end = fpos[-1] + 10
@@ -380,23 +360,22 @@ def find_sig_active_fields(sess,
                         # option to use the raw deconvolved
                         # sig_pos_this_field = sig_pos[(sig_pos >= field_start) &
                         #                              (sig_pos <= field_end)]
-                        
+
                         # bin the positions with sig activity within the full field
                         is_field_active[t, :, f_i], _ = np.histogram(
                             sig_pos_this_field, bins=tm[-2])
-                        
-                        # print(np.nansum(is_field_active[t, :, f_i], axis=-1))
+
                     else:
                         field_start = fpos[0]
                         field_end = fpos[-1]
 
-                    ## Now find COM per trial from the raw activity
-                    ## Make sure there is some sig activity in the field, otherwise skip
-                    if (np.nansum(is_field_active[t, :, f_i], axis=-1) > 0): # >= field_start) & (sig_pos <= field_end)): #too restrictive?
+                    # Now find COM per trial from the raw activity
+                    # Make sure there is some sig activity in the field, otherwise skip
+                    if (np.nansum(is_field_active[t, :, f_i], axis=-1) > 0):
                         # print('get COM per trial')
-                    # once the formation lap is identified, 
-                    # find the COM of activity within the field boundaries on all following laps
-                    ## raw activity within the boundaries:
+                        # once the formation lap is identified,
+                        # find the COM of activity within the field boundaries on all following laps
+                        # raw activity within the boundaries:
                         coord_this_field = pos_t[(
                             pos_t >= field_start) & (pos_t <= field_end)]
                         activity_this_field = activity_t[(
@@ -406,33 +385,32 @@ def find_sig_active_fields(sess,
                         keep_field_dict['set '+s]['field_rel_coms_per_trial'][cell][f_i][t_i] = keep_field_dict['set '+s][
                             'field_coms_per_trial'][cell][f_i][t_i] - keep_field_dict['set '+s]['COM'][cell][f_i]
 
-                # get the pearson's corr of each trial's spatially binned activity with the final field
                 # get rid of nans
                 neural_ = trial_mat[t, :, cell]
                 neural_[np.isnan(neural_)] = 0
 
-
-            ## outside the trial loop, again for each field, find the formation lap after the switch
+            # outside the trial loop, again for each field, find the formation lap after the switch
             keep_field_dict['set 1']['formation_lap'][cell] = np.zeros(
                 (len(keep_field_dict['set 1']['pos'][cell]),))*np.nan
-            
+
             if s == '1':
                 for f_i, fpos in enumerate(keep_field_dict['set 1']['pos'][cell]):
-                    # place_field_bool = 1 * \
-                    #     (np.nansum(is_field_active[:, :, f_i], axis=-1) > 0)
-                    
-                    ## we already restricted the COMs to the sig active in-field trials
-                    place_field_bool = np.copy(keep_field_dict['set '+s]['field_coms_per_trial'][cell][f_i])
+
+                    # Get the sig active in-field trials that we already found above
+                    place_field_bool = np.copy(
+                        keep_field_dict['set '+s]['field_coms_per_trial'][cell][f_i])
                     place_field_bool[np.isnan(place_field_bool)] = 0
-                    place_field_bool[place_field_bool>0] = 1
-                    
+                    place_field_bool[place_field_bool > 0] = 1
+
                     # find the first active trial in a 5-trial window with 3 active trials (Priestley method)
                     # formation lap since switch
-                    _formation_lap = find_first_n(place_field_bool.astype(int), 3, window=5)
-                   
-                    if _formation_lap is not None: 
-                        ## add to get trial number out of the whole session
-                        keep_field_dict['set 1']['formation_lap'][cell][f_i] = _formation_lap + np.sum(trial_dict['trial_set0'])
+                    _formation_lap = find_first_n(
+                        place_field_bool.astype(int), 3, window=5)
+
+                    if _formation_lap is not None:
+                        # add the pre-switch trials to get trial number out of the whole session
+                        keep_field_dict['set 1']['formation_lap'][cell][f_i] = _formation_lap + np.sum(
+                            trial_dict['trial_set0'])
                     else:
                         keep_field_dict['set 1']['formation_lap'][cell][f_i] = np.nan
 
@@ -464,15 +442,13 @@ def find_cells_w_nonedge_fields(field_dict, pos):
     fields_before_after = [np.logical_and(field_dict['set 0']['number'][cell]>0, field_dict['set 1']['number'][cell]>0) \
                 for cell in field_dict['set 0']['number'].keys()]
 
-    fields_before_after_ids = tmp_cell_ids[np.where(fields_before_after)[0]]
+    fields_before_after_ids = tmp_cell_ids[np.where(fields_before_after)[0]] # these will be cell indices instead of a boolean
 
-    # Further restrict the list, finding cells with sig fields that don't fall off the edge of the track
+    # Find sig fields that don't fall off the edge of the track
     track_edges = [pos[0], 
                    pos[-1]]
 
-    # these will be cell indices instead of a boolean
-    # don't through away whole cells if one of the fields overlaps an edge 
-    # -- just exclude the fields that overlap the edge
+    # exclude the fields that overlap the edge
     no_edge_in_field_0 = fields_before_after_ids[
     [~np.any(np.isin(track_edges,np.hstack(field_dict['set 0']['pos'][cell]))) \
                           for cell in fields_before_after_ids]
@@ -487,7 +463,7 @@ def find_cells_w_nonedge_fields(field_dict, pos):
                                  & np.isin(fields_before_after_ids, no_edge_in_field_1)
                                 )]
 
-    # return the updated field dict too
+    # return the updated field dict
     return fields_before_after_ids, nonedge_fields_ids
     
 ```
@@ -527,9 +503,9 @@ for day in exp_days:
 
             # find cells with sig SI in both trial sets
             and_masks = np.multiply(
-                multiDayData[day].place_cell_masks[an]['set 0'], 
+                multiDayData[day].place_cell_masks[an]['set 0'],
                 multiDayData[day].place_cell_masks[an]['set 1'])
-            
+
             # find reward-relative cells (defined by peak activity)
             RR_masks = np.zeros(
                 (len(multiDayData[day].place_cell_masks[an]['set 0'],))).astype(bool)
@@ -550,7 +526,7 @@ for day in exp_days:
 
             cell_ids = np.where(
                 (TR_masks | nonRR_masks | and_RR | appear_masks))[0]
-            
+
             # Which fields to keep per cell (runs the function defined above)
             keep_field_dict = find_sig_active_fields(multi_anim_sess[an]['sess'],
                                                      multiDayData[day].trial_dict[an],
@@ -575,10 +551,9 @@ for day in exp_days:
                                               'sig_field_cells': has_sig_fields,
                                               'nonedge_field_cells': nonedge_field_cells,
                                               })
-
 ```
 
-## Quantify place field characteristics
+## Quantify place field characteristics and plot
 
 To-do: make this run more efficiently.
 
@@ -861,12 +836,12 @@ for ct_i, ct in enumerate(ct_keys):
                 if len(orig_cells[(find_two_field & find_this_ct)]) > 0:
                     two_field_COM[ct][day]['n_anim'] += 1
 
-            # identify primary/secondary fields, where primary = most consistent reward-relative position
-            # then identifiy "main" fields -- the fields that correpond most to the peak spatial
+            # identify primary/secondary fields, where primary or "main" field = 
+            #     the field that is closest to to the peak spatial
             #     firing position of the cell used for categorization,
             #     and get the formation laps for those main fields
             for i, cell in enumerate(orig_cells[(find_this_ct)]):
-                # find distributions of circular COM for primary and non-primary fields for RR cells:
+                # find distributions of COM for primary and non-primary fields for RR cells:
                 if ct != 'appear':
                     list_1 = super_field_dict[day][an]['field_dict']['set 0']['circ_COM_aligned'][cell]
                     list_2 = super_field_dict[day][an]['field_dict']['set 1']['circ_COM_aligned'][cell]
@@ -1363,6 +1338,8 @@ int(super_field_dict[3]['GCAMP14']['field_dict']['set 1']['formation_lap'][590].
 # Field shifting
 ### Get field shift since formation lap
 
+To do: consolidate this into the main function 'find_sig_active_fields'
+
 ```python
 # data frame for post-switch dynamics
 cols = ['mouse',
@@ -1380,11 +1357,11 @@ cols = ['mouse',
 
         ]
 
-
+# Dataframe to store shifts
 shift_df = pd.DataFrame(columns=cols)
 ct_keys = ['RR', 'TR', 'nonRR', 'appear']
 
-for d_i, day in enumerate(exp_days): #exp_days):
+for d_i, day in enumerate(exp_days):
 
     for ct in ct_keys:
         for an in include_ans:
@@ -1423,7 +1400,6 @@ for d_i, day in enumerate(exp_days): #exp_days):
                         (n_fields,))*np.nan
 
                     for s in ['0', '1']:
-                        # multi_anim_sess[an]['trial dict']['trial_set'+s])[0]
                         trial_list = np.where(
                             multiDayData[day].trial_dict[an]['trial_set'+s])[0]
 
@@ -1431,6 +1407,8 @@ for d_i, day in enumerate(exp_days): #exp_days):
                             super_field_dict[day][an]['field_dict']['set '+s]['COM'][cell] -
                             multiDayData[day].peaks[an]['set '+s][cell]))
                         )
+                        
+                        # iterate through individual fields
                         for f_i in super_field_dict[day][an]['field_dict']['set '+s]['field_coms_per_trial'][cell].keys():
 
                             # plot formation lap
@@ -1482,61 +1460,6 @@ for d_i, day in enumerate(exp_days): #exp_days):
                                                                )
 
 
-```
-
-```python
-day=3
-an='GCAMP4'
-cell=212
-f_i=0
-super_field_dict[day][an]['field_dict']['set 1']['formation_lap'][cell][f_i], (
-    super_field_dict[day][an]['field_dict']['set 1']['field_coms_per_trial'][cell][f_i]
-)
-
-```
-
-```python
-test = super_field_dict[day][an]['field_dict']['set 1'][
-                                        'field_coms_per_trial'][cell][f_i]
-test.shape
-```
-
-```python
-test[np.isnan(test)]=0
-test[test>0] = 1
-print(test)
-place_field_bin_counts = sp.signal.convolve(
-                        test, [1, 1, 1, 1, 1], mode='same') # indexing is off with mode='valid'!!!!
-place_field_bin_counts.shape, place_field_bin_counts
-```
-
-```python
-dummy = np.array([0,1,0,1,0,0,0,0,0,])
-```
-
-```python
-find_ = find_first_n(test, 3)
-find_, find_ is None
-```
-
-```python
-# find windows where there were at least 3 active trials
-thresh_laps = np.zeros(test.shape)
-thresh_laps[:place_field_bin_counts.shape[0]
-            ] = 1*(place_field_bin_counts >= 3)
-thresh_active_laps = np.argwhere(
-    thresh_laps*test)
-thresh_active_laps
-```
-
-```python
-super_field_dict[day][an]['field_dict']['set 1'][
-                                        'field_coms_per_trial'][cell][f_i][trial_list==int(super_field_dict[day][an]['field_dict']['set 1']['formation_lap'][cell][f_i])]
-# once the formation lap is identified, find the COM of activity within the field boundaries on all following laps
-```
-
-```python
-main_field
 ```
 
 ### Shifting plots
@@ -1639,7 +1562,7 @@ ax_cdf.set_title("n_RR=%.2f, n_TR=%.2f, n_nonRR=%.2f, n_appear=%.2f, \n \
 ax_cdf.set_xticks(np.arange(30,100,10))
 ax_cdf.set_xlim([ax_cdf.get_xlim()[0], 90])
 
-save_figures = True
+save_figures = False
 if save_figures:
     pt.savefig(
         fig_cdf,
@@ -1658,7 +1581,7 @@ if save_figures:
 
 ```python
 pingouin.pairwise_ttests(data=shift_df, dv='formation_lap', between='ct', parametric=False, padjust='bonferroni')
-# this reports the raw U value, whereas sp.stats.ranksums reports a standardized, z-scored U value
+# this reports the raw U value, whereas sp.stats.ranksums reports a standardized, z-scored U value "Z"
 ```
 
 ```python
@@ -1666,15 +1589,15 @@ shift_df.head()
 ```
 
 ```python tags=[]
-## Primary (main) field shifts, backwards vs. forward switches
-## Ext Fig. 3o, stats for  Ext Fig. 3p
+# Primary (main) field shifts, backwards vs. forward switches
+# Ext Fig. 3o, stats for  Ext Fig. 3p
 
 # fig, ax = plt.subplots(len(ct_keys),8,figsize=(28,12))
-fig2, ax2 = plt.subplots(1,len(ct_keys)+2,figsize=(18,4.5))
+fig2, ax2 = plt.subplots(1, len(ct_keys)+2, figsize=(18, 4.5))
 n_shuf = 100
 
 print('-- primary field shifts, backwards vs. forward --')
-for ct_i,ct in enumerate(['RR','TR','nonRR','appear']):
+for ct_i, ct in enumerate(['RR', 'TR', 'nonRR', 'appear']):
     if ct == "RR":
         vcolor = "orange"
     elif ct == "TR":
@@ -1683,34 +1606,34 @@ for ct_i,ct in enumerate(['RR','TR','nonRR','appear']):
         vcolor = "grey"
     elif ct == "appear":
         vcolor = "brown"
-    
-    shift_df_ct = shift_df[shift_df['ct']==ct]
 
-    sns.ecdfplot( data=shift_df_ct[(shift_df_ct['is_main_field'])],
+    shift_df_ct = shift_df[shift_df['ct'] == ct]
+
+    sns.ecdfplot(data=shift_df_ct[(shift_df_ct['is_main_field'])],
         x='shift',
             stat="proportion",
             legend=True,
             ax=ax2[0],
             color=vcolor,
         )
-    
-    sns.histplot(data=shift_df_ct[(shift_df_ct['is_main_field'])], 
-                 ax=ax2[1], stat="probability", 
-                     x="shift", kde=True, binwidth = 2, binrange = (-100,100),
+
+    sns.histplot(data=shift_df_ct[(shift_df_ct['is_main_field'])],
+                 ax=ax2[1], stat="probability",
+                     x="shift", kde=True, binwidth=2, binrange=(-100, 100),
                      color=vcolor,
-                     element="bars",
+                     # element="bars",
                 )
-    ax2[1].vlines(shift_df_ct[(shift_df_ct['is_main_field'])]['shift'].median(), 
+    ax2[1].vlines(shift_df_ct[(shift_df_ct['is_main_field'])]['shift'].median(),
                              0, 0.05, color=vcolor, linestyle='--');
-    
+
     # compare backward and forward shifts of main field
     backward = shift_df_ct[(shift_df_ct['is_main_field']) &
-                (shift_df_ct['switch_dir']=='backward')]['shift']
+                (shift_df_ct['switch_dir'] == 'backward')]['shift']
     forward = shift_df_ct[(shift_df_ct['is_main_field']) &
-                (shift_df_ct['switch_dir']=='forward')]['shift']
+                (shift_df_ct['switch_dir'] == 'forward')]['shift']
     print(ct, 'n_backward:', len(backward), 'n_forward', len(forward))
     sns.ecdfplot(data=shift_df_ct[(shift_df_ct['is_main_field']) &
-                                  (shift_df_ct['switch_dir']=='backward')],
+                                  (shift_df_ct['switch_dir'] == 'backward')],
         x='shift',
             stat="proportion",
             legend=True,
@@ -1718,8 +1641,8 @@ for ct_i,ct in enumerate(['RR','TR','nonRR','appear']):
             color=vcolor,
                  label='backward'
         )
-    sns.ecdfplot( data=shift_df_ct[(shift_df_ct['is_main_field']) &
-                                  (shift_df_ct['switch_dir']=='forward')],
+    sns.ecdfplot(data=shift_df_ct[(shift_df_ct['is_main_field']) &
+                                  (shift_df_ct['switch_dir'] == 'forward')],
         x='shift',
             stat="proportion",
             legend=True,
@@ -1728,108 +1651,120 @@ for ct_i,ct in enumerate(['RR','TR','nonRR','appear']):
                  linestyle='--',
                  label='forward'
         )
-    st_dir, p_dir= sp.stats.ranksums(
+    st_dir, p_dir = sp.stats.ranksums(
     backward,
     forward,
     )
-    
+
     # permutation test for switch direction
-    Z_shuf = np.zeros((n_shuf,2))
+    Z_shuf = np.zeros((n_shuf, 2))
     for n in range(n_shuf):
         switch_dir_shuffle = np.copy(shift_df_ct['switch_dir'].values)
         np.random.shuffle(switch_dir_shuffle)
         shift_df_ct['switch_dir_shuffle'] = switch_dir_shuffle
         backward_shuf = shift_df_ct[(shift_df_ct['is_main_field']) &
-                        (shift_df_ct['switch_dir_shuffle']=='backward')]['shift']
+                        (shift_df_ct['switch_dir_shuffle'] == 'backward')]['shift']
         forward_shuf = shift_df_ct[(shift_df_ct['is_main_field']) &
-                    (shift_df_ct['switch_dir_shuffle']=='forward')]['shift']
+                    (shift_df_ct['switch_dir_shuffle'] == 'forward')]['shift']
 
-        Z_shuf[n,0], Z_shuf[n,1]= sp.stats.ranksums(
+        Z_shuf[n, 0], Z_shuf[n, 1] = sp.stats.ranksums(
         backward_shuf,
         forward_shuf,
         )
-    p_perm = ut.permutation_test(Z_shuf[:,0], st_dir)
-    
+    p_perm = ut.permutation_test(Z_shuf[:, 0], st_dir)
+
     ax2[ct_i+2].set_title('%s backward main mean ± std: %.2f ± %.2f \n median shift: %.2f \n \
                            forward main mean ± std: %.2f ± %.2f \n median shift: %.2f \n \
                              U=%.2f, p=%.2e \n p_Uperm = %.2e'
                              % (ct,
             backward.mean(),
-            backward.std(),        
+            backward.std(),
             backward.median(),
             forward.mean(),
-            forward.std(),        
+            forward.std(),
             forward.median(),
-                                st_dir, 
+                                st_dir,
                                 p_dir,
                                 p_perm
-                            ),fontsize=10)
-    ax2[ct_i+2].vlines(0,0,1,color='grey',linestyle='--')
+                            ), fontsize = 10)
+    ax2[ct_i+2].vlines(0, 0, 1, color = 'grey', linestyle = '--')
     ax2[ct_i+2].legend()
-    
+
 # ks
-st_RRTR_ks, p_RRTR_ks = sp.stats.ks_2samp(
-    shift_df[(shift_df['ct']=='RR') & (shift_df['is_main_field'])]['shift'],
-    shift_df[(shift_df['ct']=='TR') & (shift_df['is_main_field'])]['shift'],
+st_RRTR_ks, p_RRTR_ks=sp.stats.ks_2samp(
+    shift_df[(shift_df['ct'] == 'RR') & (shift_df['is_main_field'])]['shift'],
+    shift_df[(shift_df['ct'] == 'TR') & (shift_df['is_main_field'])]['shift'],
 )
 # print(st_RRTR, p_RRTR)
-st_TRnonRR_ks, p_TRnonRR_ks = sp.stats.ks_2samp(
-    shift_df[(shift_df['ct']=='TR') & (shift_df['is_main_field'])]['shift'],
-    shift_df[(shift_df['ct']=='nonRR') & (shift_df['is_main_field'])]['shift'],
+st_TRnonRR_ks, p_TRnonRR_ks=sp.stats.ks_2samp(
+    shift_df[(shift_df['ct'] == 'TR') & (shift_df['is_main_field'])]['shift'],
+    shift_df[(shift_df['ct'] == 'nonRR') & (
+        shift_df['is_main_field'])]['shift'],
 )
 # print(st_TRnonRR, p_TRnonRR)
-st_RRnonRR_ks, p_RRnonRR_ks = sp.stats.ks_2samp(
-    shift_df[(shift_df['ct']=='RR') & (shift_df['is_main_field'])]['shift'],
-    shift_df[(shift_df['ct']=='nonRR') & (shift_df['is_main_field'])]['shift'],
+st_RRnonRR_ks, p_RRnonRR_ks=sp.stats.ks_2samp(
+    shift_df[(shift_df['ct'] == 'RR') & (shift_df['is_main_field'])]['shift'],
+    shift_df[(shift_df['ct'] == 'nonRR') & (
+        shift_df['is_main_field'])]['shift'],
 )
 # print(st_RRnonRR, p_RRnonRR)
-st_RRappear_ks, p_RRappear_ks = sp.stats.ks_2samp(
-    shift_df[(shift_df['ct']=='RR') & (shift_df['is_main_field'])]['shift'],
-    shift_df[(shift_df['ct']=='appear') & (shift_df['is_main_field'])]['shift'],
+st_RRappear_ks, p_RRappear_ks=sp.stats.ks_2samp(
+    shift_df[(shift_df['ct'] == 'RR') & (shift_df['is_main_field'])]['shift'],
+    shift_df[(shift_df['ct'] == 'appear') & (
+        shift_df['is_main_field'])]['shift'],
 )
-st_TRappear_ks, p_TRappear_ks = sp.stats.ks_2samp(
-    shift_df[(shift_df['ct']=='TR') & (shift_df['is_main_field'])]['shift'],
-    shift_df[(shift_df['ct']=='appear') & (shift_df['is_main_field'])]['shift'],
+st_TRappear_ks, p_TRappear_ks=sp.stats.ks_2samp(
+    shift_df[(shift_df['ct'] == 'TR') & (shift_df['is_main_field'])]['shift'],
+    shift_df[(shift_df['ct'] == 'appear') & (
+        shift_df['is_main_field'])]['shift'],
 )
-st_nonRRappear_ks, p_nonRRappear_ks = sp.stats.ks_2samp(
-    shift_df[(shift_df['ct']=='nonRR') & (shift_df['is_main_field'])]['shift'],
-    shift_df[(shift_df['ct']=='appear') & (shift_df['is_main_field'])]['shift'],
+st_nonRRappear_ks, p_nonRRappear_ks=sp.stats.ks_2samp(
+    shift_df[(shift_df['ct'] == 'nonRR') & (
+        shift_df['is_main_field'])]['shift'],
+    shift_df[(shift_df['ct'] == 'appear') & (
+        shift_df['is_main_field'])]['shift'],
 )
 
 # ranksums
 
-st_RRTR, p_RRTR = sp.stats.ranksums(
-    shift_df[(shift_df['ct']=='RR') & (shift_df['is_main_field'])]['shift'],
-    shift_df[(shift_df['ct']=='TR') & (shift_df['is_main_field'])]['shift'],
+st_RRTR, p_RRTR=sp.stats.ranksums(
+    shift_df[(shift_df['ct'] == 'RR') & (shift_df['is_main_field'])]['shift'],
+    shift_df[(shift_df['ct'] == 'TR') & (shift_df['is_main_field'])]['shift'],
 )
 # print(st_RRTR, p_RRTR)
-st_TRnonRR, p_TRnonRR = sp.stats.ranksums(
-    shift_df[(shift_df['ct']=='TR') & (shift_df['is_main_field'])]['shift'],
-    shift_df[(shift_df['ct']=='nonRR') & (shift_df['is_main_field'])]['shift'],
+st_TRnonRR, p_TRnonRR=sp.stats.ranksums(
+    shift_df[(shift_df['ct'] == 'TR') & (shift_df['is_main_field'])]['shift'],
+    shift_df[(shift_df['ct'] == 'nonRR') & (
+        shift_df['is_main_field'])]['shift'],
 )
 # print(st_TRnonRR, p_TRnonRR)
-st_RRnonRR, p_RRnonRR = sp.stats.ranksums(
-    shift_df[(shift_df['ct']=='RR') & (shift_df['is_main_field'])]['shift'],
-    shift_df[(shift_df['ct']=='nonRR') & (shift_df['is_main_field'])]['shift'],
+st_RRnonRR, p_RRnonRR=sp.stats.ranksums(
+    shift_df[(shift_df['ct'] == 'RR') & (shift_df['is_main_field'])]['shift'],
+    shift_df[(shift_df['ct'] == 'nonRR') & (
+        shift_df['is_main_field'])]['shift'],
 )
 # print(st_RRnonRR, p_RRnonRR)
 
-st_RRappear, p_RRappear = sp.stats.ranksums(
-    shift_df[(shift_df['ct']=='RR') & (shift_df['is_main_field'])]['shift'],
-    shift_df[(shift_df['ct']=='appear') & (shift_df['is_main_field'])]['shift'],
+st_RRappear, p_RRappear=sp.stats.ranksums(
+    shift_df[(shift_df['ct'] == 'RR') & (shift_df['is_main_field'])]['shift'],
+    shift_df[(shift_df['ct'] == 'appear') & (
+        shift_df['is_main_field'])]['shift'],
 )
-st_TRappear, p_TRappear = sp.stats.ranksums(
-    shift_df[(shift_df['ct']=='TR') & (shift_df['is_main_field'])]['shift'],
-    shift_df[(shift_df['ct']=='appear') & (shift_df['is_main_field'])]['shift'],
+st_TRappear, p_TRappear=sp.stats.ranksums(
+    shift_df[(shift_df['ct'] == 'TR') & (shift_df['is_main_field'])]['shift'],
+    shift_df[(shift_df['ct'] == 'appear') & (
+        shift_df['is_main_field'])]['shift'],
 )
-st_nonRRappear, p_nonRRappear = sp.stats.ranksums(
-    shift_df[(shift_df['ct']=='nonRR') & (shift_df['is_main_field'])]['shift'],
-    shift_df[(shift_df['ct']=='appear') & (shift_df['is_main_field'])]['shift'],
+st_nonRRappear, p_nonRRappear=sp.stats.ranksums(
+    shift_df[(shift_df['ct'] == 'nonRR') & (
+        shift_df['is_main_field'])]['shift'],
+    shift_df[(shift_df['ct'] == 'appear') & (
+        shift_df['is_main_field'])]['shift'],
 )
 
-ax2[0].vlines(0,0,1,color='grey',linestyle='--')
-ax2[0].set_xlim([-100,100])
-ax2[1].set_xlim([-100,100])
+ax2[0].vlines(0, 0, 1, color = 'grey', linestyle = '--')
+ax2[0].set_xlim([-100, 100])
+ax2[1].set_xlim([-100, 100])
 
 
 ax2[0].set_title(
@@ -1844,11 +1779,7 @@ ax2[0].set_title(
                 st_RR-vs-nonRR=%.2f, p_RR-vs-nonRR=%.2e \n \
                 st_RR-vs-appear=%.2f, p_RR-vs-appear=%.2e \n \
                 st_TR-vs-appear=%.2f, p_TR-vs-appear=%.2e \n \
-                st_nonRR-vs-appear=%.2f, p_nonRR-vs-appear=%.2e" 
-    
-                # st_RR-vs-appear=%.2f, p_RR-vs-appear=%.2e \n \
-                # st_TR-vs-appear=%.2f, p_TRvsnonRR=%.2e \n \
-                # st_nonRR-vs-appear=%.2f, p_nonRR-vs-appear=%.2e"
+                st_nonRR-vs-appear=%.2f, p_nonRR-vs-appear=%.2e"
     % ((0.05/6),
        st_RRTR_ks,
         p_RRTR_ks,
@@ -1874,11 +1805,11 @@ ax2[0].set_title(
         p_TRappear,
         st_nonRRappear,
         p_nonRRappear,
-        
+
     ),
     fontsize=10,
 )
-save_figures = False
+save_figures=False
 if save_figures:
     pt.savefig(
         fig2,
@@ -1893,7 +1824,6 @@ if save_figures:
         ),
         extension=".svg",
     )
-
 ```
 
 ```python tags=[]
@@ -2013,10 +1943,6 @@ pkl_df_name = 'allSwitchAns_days%s_%s_ShiftDf_%s.pickle' % (
                     ut.make_day_tag(exp_days), '-'.join([ct for ct in ct_keys]), dt)
 shift_df = dill.load(open(os.path.join(path_dict['preprocessed_root'], 'pickle_scratch', pkl_df_name), "rb"))
 
-```
-
-```python
-shift_df
 ```
 
 ```python
