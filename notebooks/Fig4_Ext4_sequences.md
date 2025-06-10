@@ -25,20 +25,16 @@ jupyter:
 
 ```python tags=[]
 %matplotlib inline
-# inline, widget
+%load_ext autoreload
+%autoreload 2
 
-import math
-import sys
 import os
-import glob
-import pickle
 import dill
 import numpy as np
 import scipy as sp
 import pandas as pd
 import warnings
 from tqdm import tqdm
-import itertools
 import copy
 import astropy
 from astropy import stats
@@ -46,32 +42,23 @@ import phase_precession.core as ppcore
 from datetime import datetime
 
 from matplotlib import pyplot as plt, axes as axes
-from matplotlib import gridspec, cm
+from matplotlib import cm
 import statsmodels.formula.api as smf
 import seaborn as sns
 sns.set_style("white")
 
-from reward_relative import behavior as behav
-from reward_relative import preprocessing as pp
 from reward_relative import utilities as ut
 from reward_relative import plotUtils as pt
-from reward_relative import xcorr as xc
 from reward_relative import spatial
 from reward_relative import placeCellPlot
 from reward_relative import dayData as dd
-from reward_relative import multiDayROIAlign as roiAlign
 from reward_relative import circ
-from reward_relative import rewardAnalysis as ra
 from reward_relative import regression
     
 import TwoPUtils
 
 import sklearn
 from sklearn.impute import KNNImputer
-
-
-%load_ext autoreload
-%autoreload 2
 
 save_figures = False
 ```
@@ -103,17 +90,6 @@ exp_days = [3, 5, 7, 8, 10, 12, 14]
 
 max_anim_list = dd.max_anim_list(experiment, exp_days, year='combined')
 ts_key = 'dff'  # used to find place field peaks
-smooth = False  # whether to smooth for finding place cell peaks
-sigma = 1
-exclude_int = True  # exclude putative interneurons
-int_thresh = 0.5
-
-place_cell_logical = 'or'
-
-reward_dist_inclusive = 50
-reward_dist_exclusive = 50
-
-use_speed_thr = True
 
 dt = "202504"
 
@@ -209,6 +185,8 @@ seq, _, _, _ = placeCellPlot.plot_sequences(multiDayData,
 
 ### Find shape of sequence
 
+Collect place cell peak locations in each subpopulation along with variance of this distribution and of licking behavior.
+
 ```python
 # Shape of sequences for each animal, before vs after
 print(celltype) # NOTE THIS IS SET ABOVE
@@ -291,20 +269,6 @@ for d_i, d in enumerate(seq.keys()):
 
         if np.any(~np.isnan(seq_pos0[d][an])):
 
-#             hist_0, _ = np.histogram(seq_pos0[d][an], bins=bin_edges)
-#             hist_norm_to_seq_0 = (hist_0 / len(seq_pos0[d][an]))
-#             hist_norm_to_all_0 = hist_0 / n_cells
-
-#             hist_1, _ = np.histogram(seq_pos1[d][an], bins=bin_edges)
-#             hist_norm_to_seq_1 = (hist_1 / len(seq_pos1[d][an]))
-#             hist_norm_to_all_1 = hist_1 / n_cells
-
-
-#             seqvar0[an_i, d_i] = astropy.stats.circstats.circvar(
-#                 seq_pos0[d][an])
-#             seqvar1[an_i, d_i] = astropy.stats.circstats.circvar(
-#                 seq_pos1[d][an])
-
             this_df_idx = ((seq_shape_df['an'] == an)
                            & (seq_shape_df['day'] == d))
 
@@ -359,12 +323,11 @@ seq_shape_df['seqmean0_cm'] = spatial.dist_rad_to_cm(
     seq_shape_df['seqmean0'], 450, 0)
 seq_shape_df['seqmean1_cm'] = spatial.dist_rad_to_cm(
     seq_shape_df['seqmean1'], 450, 0)
-# rho, pval, slope, phi, gof = ppcore.cl_corr(all_lickposstd, all_circvar, -1, 1, return_pval=True)
-# ax3.set_title('rho=%.2e, p=%.2e' % (rho,pval))
+
 ```
 
 ## Density of sequences 
-(shape of distribution of positions relative to reward or track)
+(histogram of distribution of positions relative to reward or track)
 
 ```python
 # plotting options
@@ -564,7 +527,7 @@ for d in exp_days:
 # ut.write_source_csv(df_src_speed, "4l")
 ```
 
-#### Optional:
+### Optional:
 
 [Get next cell population](#Start-here-for-Fig-4j-onward)
 
@@ -651,13 +614,12 @@ print('left column = before switch; right column = after switch')
 ```
 
 ```python
-## To-do - pick joint examples
 seq_shape_df.sort_values(by=['seqvar0','lickvar0'], ascending=True)
 ```
 
 #### Plot the examples in Ext Fig. 4f-g
 
-Here just for "before", feel free to change it
+Here just for "before" trials, feel free to change it
 
 ```python
 # Pick a low and high sequence variance example from the dataframe above
@@ -682,9 +644,9 @@ pt.plot_mean_sem(ax[0,1],
 narrow_hist = np.histogram(seq_pos0[narrow_day][narrow_an], #mean_seq_pos[narrow_day][narrow_an], 
                                                        bins=bin_edges)[0] / np.sum(
             multiDayData[narrow_day].overall_place_cell_masks[narrow_an])
-narrow_hist = ut.nansmooth(best_hist,1)
+narrow_hist = ut.nansmooth(narrow_hist,1)
 
-ax[1,0].plot(bin_centers, best_hist)
+ax[1,0].plot(bin_centers, narrow_hist)
 
 broad_hist = np.histogram(seq_pos0[broad_day][broad_an], #mean_seq_pos[broad_day][broad_an], 
                                                        bins=bin_edges)[0] / np.sum(
@@ -735,7 +697,6 @@ if save_figures:
 ## Quantify fractions near and far from the reward zone start from the rainbow plots (Fig. 4m-o, r)
 
 ```python
-# columns=['mouse','day','switch','frac_rr_around_rew'])
 df_seq_frac = pd.DataFrame()
 
 near_rew_bins = np.array([-multiDayData[exp_days[0]].circ_rel_stats_across_an['rdist_to_rad_exc'],
@@ -806,10 +767,10 @@ for d_i, d in enumerate(exp_days):
                                           'frac_near_reward_of_pcs_logit': sp.special.logit(ut.avoid_naninf(near_reward_norm_to_pcs))[0],
                                           'frac_far_reward_of_pcs': far_reward_norm_to_pcs[0],
                                           'frac_far_reward_of_pcs_logit': sp.special.logit(ut.avoid_naninf(far_reward_norm_to_pcs))[0],
-                                          'frac_near_ends_of_pcs': near_ends_norm_to_pcs,
-                                          'frac_far_ends_of_pcs': far_ends_norm_to_pcs,
-                                          'frac_near_ends_of_pcs_logit': sp.special.logit(ut.avoid_naninf(near_ends_norm_to_pcs)),
-                                          'frac_far_ends_of_pcs_logit': sp.special.logit(ut.avoid_naninf(far_ends_norm_to_pcs)),
+                                          'frac_near_track_ends_of_pcs': near_ends_norm_to_pcs,
+                                          'frac_far_track_ends_of_pcs': far_ends_norm_to_pcs,
+                                          'frac_near_track_ends_of_pcs_logit': sp.special.logit(ut.avoid_naninf(near_ends_norm_to_pcs)),
+                                          'frac_far_track_ends_of_pcs_logit': sp.special.logit(ut.avoid_naninf(far_ends_norm_to_pcs)),
                                           'lick_near_reward': mean_lick_near_reward,
                                           'lick_far_reward': mean_lick_away_reward,
                                           'speed_near_reward': mean_speed_near_reward,
@@ -818,7 +779,9 @@ for d_i, d in enumerate(exp_days):
 ```
 
 ```python
-fig, ax = plt.subplots(6, 2, figsize=(5, 18))
+# Run LMMs and plot
+
+fig, ax = plt.subplots(5, 2, figsize=(5, 15))
 
 keys = ['near_reward_of_pcs','far_reward_of_pcs']
 palette = "tab10"
@@ -830,26 +793,26 @@ for k_i, key in enumerate(keys):
     pt.lmm_plot('switch', f'frac_{key}_logit', df_seq_frac,
                 ax=ax[k_i, 1], legend_on=False, palette=palette)
 
-pt.lmm_plot('switch', 'frac_near_ends_of_pcs', df_seq_frac,
+pt.lmm_plot('switch', 'frac_near_track_ends_of_pcs', df_seq_frac,
             ax=ax[2, 0], legend_on=False, palette=palette)
-pt.lmm_plot('switch', 'frac_far_ends_of_pcs', df_seq_frac,
-            ax=ax[3, 0], legend_on=False, palette=palette)
-pt.lmm_plot('switch', 'frac_near_ends_of_pcs', df_seq_frac, ax=ax[2, 1], legend_on=False, palette=palette,
-            logit_expit=logit_expit)
+pt.lmm_plot('switch', 'frac_far_track_ends_of_pcs', df_seq_frac,
+            ax=ax[2, 1], legend_on=False, palette=palette)
+# pt.lmm_plot('switch', 'frac_near_track_ends_of_pcs', df_seq_frac, ax=ax[2, 1], legend_on=False, palette=palette,
+#             logit_expit=logit_expit)
 
-pt.lmm_plot('switch', 'frac_far_ends_of_pcs', df_seq_frac, ax=ax[3, 1], legend_on=False, palette=palette,
-            logit_expit=logit_expit)
+# pt.lmm_plot('switch', 'frac_far_track_ends_of_pcs', df_seq_frac, ax=ax[3, 1], legend_on=False, palette=palette,
+#             logit_expit=logit_expit)
 
 # behavior
 
 pt.lmm_plot('switch', 'lick_near_reward', df_seq_frac,
-            ax=ax[4, 0], legend_on=False, palette=palette)
+            ax=ax[3, 0], legend_on=False, palette=palette)
 pt.lmm_plot('switch', 'lick_far_reward', df_seq_frac,
-            ax=ax[4, 1], legend_on=False, palette=palette)
+            ax=ax[3, 1], legend_on=False, palette=palette)
 pt.lmm_plot('switch', 'speed_near_reward', df_seq_frac,
-            ax=ax[5, 0], legend_on=False, palette=palette)
+            ax=ax[4, 0], legend_on=False, palette=palette)
 pt.lmm_plot('switch', 'speed_far_reward', df_seq_frac,
-            ax=ax[5, 1], legend_on=False, palette=palette)
+            ax=ax[4, 1], legend_on=False, palette=palette)
 
 [ax[j, 0].set_ylim([0, ut.round_up(ax[j, 0].get_ylim()[-1], decimals=1)])
  for j in [0, 1, 2, 3]]
@@ -876,7 +839,7 @@ if save_figure:
 ```
 
 ```python
-df_seq_frac
+df_seq_frac.head()
 ```
 
 ```python

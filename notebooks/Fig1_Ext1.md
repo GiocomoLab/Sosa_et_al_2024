@@ -20,6 +20,10 @@ Requires a pre-saved `sess` class for each animal and day (each session)
 Expected run time: ~10 minutes or less
 
 ```python
+%matplotlib inline
+%load_ext autoreload
+%autoreload 2
+
 import math
 import dill
 import numpy as np
@@ -38,21 +42,13 @@ from reward_relative import dayData as dd
     
 import TwoPUtils
 
-%matplotlib inline
-
-%load_ext autoreload
-%autoreload 2
-
 ## SET FIGURE PARAMETERS
 pt.set_fig_params(fontsize=12)
 ```
 
 #### Specify your path dictionary
 
-Copy and rename `path_dict.py` to a new file and edit it with the paths on your system.  \
-Current options:
-`path_dict_josquin`, `path_dict_firebird`, etc
-
+Copy and rename `path_dict.py` to a new file and edit it with the paths on your system.
 
 
 ```python
@@ -360,6 +356,9 @@ with warnings.catch_warnings():
                     # Plot speed
                     if plot_speed:
                         if len(speed_mat) > 0:
+                            ax_sp[max_anim_list.index(
+                                an), d_i].set_ylim([0, 110])
+                            
                             pt.plot_mean_sem(ax_sp[max_anim_list.index(an), d_i],
                                              np.nanmean(
                                                  speed_mat[0][trials, :], axis=0),
@@ -384,8 +383,7 @@ with warnings.catch_warnings():
                                 'speed (cm/s)')
                             ax_sp[max_anim_list.index(an), d_i].set_title(
                                 "m%s, d%d" % (ut.get_mouse_number(an),d))
-                            ax_sp[max_anim_list.index(
-                                an), d_i].set_ylim([0, 110])
+                            
 
             else:
                 multi_anim_sess[an]['mean licks ' + k] = None
@@ -475,7 +473,7 @@ with warnings.catch_warnings():
 ```python
 # By block
 exp_days = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-            12, 13, 14]  # [1,3,5,6,7,8,9,10,12,14,15,17]
+            12, 13, 14]
 experiment = 'MetaLearn'
 
 blockData = dict()

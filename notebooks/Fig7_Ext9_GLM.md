@@ -24,7 +24,8 @@ See a [really nice tutorial](https://github.com/sytseng/GLM_Tensorflow_2/blob/ma
 
 ```python
 %matplotlib inline
-# inline, widget
+%load_ext autoreload
+%autoreload 2
 
 import math
 import sys
@@ -54,8 +55,6 @@ import sklearn
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import SplineTransformer, QuantileTransformer
 
-%load_ext autoreload
-%autoreload 2
 
 save_figures = False
 ```
@@ -133,7 +132,7 @@ max_anim_list = dd.max_anim_list(experiment,exp_days, year='combined')
 ts_key = 'dff' # used to find place field peaks
 
     
-dt = "202504" #"20240530-1141"
+dt = "202504"
 
 pkl_name = "m%s-%s_expdays%s_multiDayData_%s_%s.pickle" % (ut.get_mouse_number(max_anim_list[0]),
                                                            ut.get_mouse_number(
@@ -170,7 +169,7 @@ del multiDayData
 ## initialize
 
 # include_ans = multiDayDataSub[day].circ_rel_info_switch_an['include_ans']
-frac_dev_thr = 0.15
+frac_dev_thr = 0.15 # fraction deviance explained threshold to keep "well-fit" cells
 days = [3,5,7,8,10,12,14]
 FDE_full_model = {}
 FED_pos = {}
@@ -289,7 +288,7 @@ for day in days:
 
         if fit_model:
             # Initialize GLM_CV (here we're only specifying key input arguments; 
-            # others are left as default values; see documentation for details)
+            # others are left as default values; see Shih-Yi's documentation for details)
             model_cv = glm.GLM_CV(n_folds=5, auto_split=True, split_by_group=True,
                                   activation='exp', loss_type='poisson',
                                   regularization='group_lasso', lambda_series=10.0 ** np.linspace(-1, -6, 11),
@@ -446,7 +445,7 @@ for day in days:
             else:
                 continue
 
-            # Put ablated features to 0 (you can do random shuffling here instead)
+            # Set ablated features to 0 (you can do random shuffling here instead)
             X_ablated[:, ablate_ind] = 0
 
             # Make prediction on X_ablated (on CV held-out data)
@@ -462,7 +461,7 @@ for day in days:
             # Take average difference in deviance
             diff_dev_avg = np.mean(diff_dev, axis=0)
 
-            # Compute position/temporally aligned difference in deviance
+            # Compute position-binned difference in deviance
             diff_dev_pos = glmUtils.pos_binning(diff_dev, posF[train_idx],
                                                 pos_centers, pos_half_width, )
 
@@ -470,21 +469,22 @@ for day in days:
 
         all_diff_dev_pos = np.stack(all_diff_dev_pos, axis=2)
 
-        # Compute position and time binned explained deviance of the full model (capped by 0)
+        # Compute position-binned explained deviance of the full model (capped by 0)
         expl_dev_pos = np.maximum(null_dev_pos - model_dev_pos, 0)
 
         # Compute average null deviance and explained deviance (used as normalizing factors in the next steps)
         null_dev_avg = np.mean(null_dev, axis=0)
         expl_dev_avg = np.mean(null_dev - model_dev_full, axis=0)
 
-        # Compute fraction explained deviance (capped by position and time binned explained deviance,
+        # Compute fraction explained deviance i.e. "RELATIVE CONTRIBUTION"
+        # (capped by position binned explained deviance,
         # then normalized by average explained deviance)
         frac_expl_dev_pos = np.minimum(
             all_diff_dev_pos, expl_dev_pos[:, :, np.newaxis])/expl_dev_avg[np.newaxis, :, np.newaxis]  # <- original
         # # Cap deviance difference at -1 if needed -- this didn't change anything
         # frac_expl_dev_pos = np.minimum(np.maximum(all_diff_dev_pos,-1),expl_dev_pos[:,:,np.newaxis])/expl_dev_avg[np.newaxis,:,np.newaxis]
 
-        # Compute fraction null deviance (capped by position and time binned null deviance,
+        # Compute fraction null deviance (capped by position binned null deviance,
         # then normalized by average null deviance) 
         frac_null_dev_pos = np.minimum(
             all_diff_dev_pos, null_dev_pos[:, :, np.newaxis])/null_dev_avg[np.newaxis, :, np.newaxis]  # <- original
@@ -637,8 +637,7 @@ for an in include_ans:
         all_is_rr.append(multiDayDataSub[day].reward_rel_cell_ids[an].tolist())
         all_is_track.append(is_track.tolist())
         all_is_nonrrr.append(is_nonrrr.tolist())
-        
-        # all_orig_xcp.append(multiDayData[day].reward_rel_xcorr_above_shuf[an])
+
 
 all_is_track = np.concatenate(np.asarray(all_is_track))
 all_is_nonrrr = np.concatenate(np.asarray(all_is_nonrrr))
@@ -807,12 +806,8 @@ for t_i, t in enumerate(celltypes):
     data_to_plot = df_glm[df_glm['celltype']==t]
     for var_i, var in enumerate(var_plot_order):
         var_id = all_var.index(var)   
-        # sns.boxplot(data = data_to_plot)
-        # vm_fed = ax[t_i].violinplot(data_to_plot['FED_'+var].values,
-        #                             positions=[var_i],
-        #                             showmeans=True,
-        #                             showextrema=False,
-        #                             )  
+ 
+        # Distribution across cells as a boxplot
         box_fed = ax[t_i].boxplot(data_to_plot['FED_'+var].values,
                                     positions=[var_i],
                                   whis = (2.5, 97.5),
@@ -821,6 +816,7 @@ for t_i, t in enumerate(celltypes):
                                   widths=0.5,
                                   bootstrap = 10000,
                                     )  
+        # Plot individual medians per mouse as colored dots
         box_fed['medians'][0].set(color = 'k')
         for an_i,an in enumerate(include_ans):
             this_median = np.median(data_to_plot[
@@ -844,7 +840,9 @@ if save_figures:
                    )
 ```
 
-### Find fraction of cells in each type with each var as their top, second-top, and bottom predictor
+## Find fraction of cells in each type with each var as their top, second-top, and bottom predictor
+
+Pie charts for Fig. 7e and Ext. Fig. 9
 
 ```python
 frac_max_var = pd.DataFrame(index=['track','rr','nonreward_remap'],
