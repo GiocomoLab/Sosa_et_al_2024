@@ -1,6 +1,7 @@
 # Sosa_et_al_2024
-Code for analyses and figures in Sosa, Plitt, Giocomo 2024;  \
-by Mari Sosa with contributions from Mark Plitt and the resources listed below.
+Code for analyses and figures in:  \
+Sosa, Plitt, Giocomo. 2025. [A flexible hippocampal population code for experience relative to reward](https://www.nature.com/articles/s41593-025-01985-4). _Nature Neuroscience_.  \
+Repo by Mari Sosa with contributions from Mark Plitt and the resources listed below.
 
 [System requirements](#System-Requirements)  \
 [Environments](#Environment-set-up)  \
@@ -118,6 +119,9 @@ At the top of your code, import the path dictionary:
 ```python
 from reward_relative.path_dict_username import path_dictionary as path_dict
 ```
+## Data download
+
+See [these instructions](docs/data_download.md).
 
 ## Data organization
 
@@ -137,8 +141,6 @@ Processed data (starting with `sess` classes) exist in 3 current levels of organ
 ## Preprocessing guide
 
 [Order of operations for running preprocessing](docs/preprocessing_guide.md)
-
-More documentation coming soon
 
 ### Using jupytext for .ipynb version control
 
