@@ -19,8 +19,7 @@ jupyter:
 ### Table of contents
 
 [Load multiDayData, where cells have already been classified by remapping type](#Load-pre-saved-multiDayData)  \
-[Inspect cells by remapping type](#Inspect-cells-by-remapping-type)  \
-[Plot example place cells by remapping type](#Plot-example-place-cells-by-remapping-type)  \
+[Inspect and plot cells by remapping type](#Inspect-cells-by-remapping-type)  \
 [Count cells by remapping type](#Count-cells-by-remapping-type)  \
 [Test whether reward-relative remapping exceeds chance](#Circular-analysis-to-test-whether-fraction-of-reward-relative-cells-exceeds-chance)  \
 [Quantify increase in reward-relative remapping across days](#Fraction-above-Shuffle)  \
@@ -28,7 +27,8 @@ jupyter:
 
 ```python tags=[]
 %matplotlib inline
-# inline, widget
+%load_ext autoreload
+%autoreload 2
 
 import os
 import pickle
@@ -53,9 +53,6 @@ from reward_relative import placeCellPlot
 from reward_relative import dayData as dd
 from reward_relative import regression
     
-
-%load_ext autoreload
-%autoreload 2
 
 save_figures = False
 ```
@@ -95,10 +92,11 @@ max_anim_list = dd.max_anim_list(experiment, exp_days, year=year)
 # exclude_int = True  # exclude putative interneurons
 # int_thresh = 0.5
 
-## Place cell definitions:
+## Place cell logical definitions:
 ## 'and' = must have significant spatial information
 ## in trial set 0 AND trial set 1 (i.e. before and after the reward switch)
 ## 'or' = must have signitive spatial information in trial set 0 OR trial set 1
+
 # place_cell_logical = 'or'
 ts_key = 'dff'  # which timeseries to use for finding peaks
 # use_speed_thr = True  # use a speed threshold to calculate new trial matrices
@@ -132,7 +130,7 @@ include_ans
 
 ## Inspect cells by remapping type
 
-PLEASE READ A BRIEF NOTE ABOUT CELL CLASSIFICATION:
+PLEASE READ A NOTE ABOUT CELL CLASSIFICATION:
 
 Note that the order of operations in the study was to characterize remapping  \
 agnostic of whether cells were "reward-relative", and then investigate the  \
@@ -141,7 +139,7 @@ agnostic of whether cells were "reward-relative", and then investigate the  \
 Once we start considering reward-relative cells, there can technically be  \
 some overlap with the other categories, so we exclude the reward-relative  \
 cells from those categories from further analysis. This is because reward-  \
-relative (RR) cells are not required to have "significant" spatial information  \
+relative (RR) cells are not required to have "significant" spatial information (SI)  \
 both before and after the reward switch, as we found that was unneccesarily  \
 restrictive (but note, requiring sig. SI before and after did not qualitatively  \
 change the main results, just reduced the number of cells considered). In addition,  \
@@ -161,18 +159,31 @@ Once the 2 criteria for identifying reward-relative cells are applied (see Metho
 Once "reward-relative" are excluded from nonreward_remap, the remaining nonreward_remap cells \
 are the "non-reward-relative remapping cells" described in the paper. 
 
-Note: there can also be "reward" cells that are not also "reward-relative" if both of their  \
-peaks are within 50 cm of reward (within a 100 cm span on either side of reward)  \
-but not within 50 cm of _each other_ relative to reward (50 cm span). 
+Note: there can also be "reward" cells that are not also "reward-relative" if their  \
+peak firing is within 50 cm of both reward locations (within a 100 cm span on either side  \
+the reward zone start) but not within 50 cm of _each other_ relative to reward (50 cm span). 
 
 These cell categories are meant to be a descriptive way to capture the heterogeneity  \
 of remapping patterns. They are not meant to assign biologically meaningful "cell types",  \
-even though I use `cell_class` as a shorthand in the code (because we are classifying cells).
+even though I use `cell_class` as a shorthand in the code.
 
 A lot of time was spent exploring the various thresholds involved here, and we  \
 did not find that changing any of them changed the conclusion, which is that reward-relative  \
 coding exists at the population level. 
 
+
+
+#### Relationship of keys used here to remapping categories in the paper:
+
+'track' = track-relative  \
+'disappear' = disappearing  \
+'appear' = appearing  \
+'reward' = remap near reward (≤50 cm from both reward zone starts)  \
+'rr' = reward-relative  \
+'reward_inc_rr' = remap near reward, including reward-relative  \
+'nonreward_remap_inc_rr' = remap far from reward (>50 cm from reward zone start), including reward-relative  \
+'nonreward_remap' = non-reward-relative (non-RR) remapping  \
+'unclassified' = cells that did not fall into any of the above groups  \
 
 ```python
 ## Get cell indices by remapping type
@@ -186,18 +197,6 @@ _, cell_inds = dd.get_cell_class_n(multiDayData, example_day, example_an, exclud
 ```python
 cell_inds.keys()
 ```
-
-#### Relationship of keys used here to remapping categories in the paper:
-
-'track' = track-relative  \
-'disappear' = disappearing  \
-'appear' = appearing  \
-'reward' = remap near reward (≤50 cm from both reward zone starts)  \
-'rr' = reward-relative  \
-'reward_inc_rr' = remap near reward, including reward-relative  \
-'nonreward_remap_inc_rr' = remap far from reward (>50 cm from reward zone start), including reward-relative  \
-'nonreward_remap' = non-reward-relative (non-RR) remapping  \
-'unclassified' = cells that did not fall into any of the above groups  \
 
 ```python
 # load multi_anim_sess that has the spatial activity to plot
@@ -250,7 +249,7 @@ if save_figures:
     )
 ```
 
-### Count cells by remapping type
+## Count cells by remapping type
 
 
 [Table of Contents](#Table-of-contents)
@@ -259,9 +258,9 @@ if save_figures:
 # Get fraction of reward relative cells out of place cells and out of all cells, per animal and day
 # NOTE! RR cells will be excluded from all the other categories unless otherwise noted.
 #   in "switch" animals, this should exclude almost 0 track-relative cells, but in fixed-condition
-#   animals or on "stay" days it will exclude a lot 
+#   animals or on "stay" days (when reward doesn't move), it will exclude a lot 
 #   (basically all the cells that are stable relative to reward). 
-#   Turn off this exclusion if desired with 
+#   If analyzing "stay" days, turn off this exclusion if desired with 
 #   bool "exclude_rr_from_others = False"
 
 switch_days = [3,5,7,8,10,12,14]
@@ -517,7 +516,7 @@ rr_stats = pingouin.pairwise_ttests(data=df_count_switch,
 [Table of contents](#Table-of-contents)
 
 ```python tags=[]
-## Scatter for individual animals with shuffle
+## Scatter for individual animals with shuffle (Fig. 2c, if example mouse m12)
 
 exclude_track_cells_here=True # whether to exclude track-relative cells 
 exclude_reward_cells_here=False # whether to exclude cells within 50 cm from reward zone start
@@ -796,6 +795,7 @@ if use_and_cells_here:
 reward_dist_exclusive_list = np.arange(10,200,10)
 frac_above_shuf_acrossAn = {} # one entry per dist to exclude
 
+# This will plot the scatters and histograms for every exclusion
 for i, rde in enumerate(reward_dist_exclusive_list):
     print("exclude", rde)
     fig1, fig2, frac_above_shuf_acrossAn[i] = dd.plot_rew_rel_hist_across_an(
@@ -811,8 +811,6 @@ for i, rde in enumerate(reward_dist_exclusive_list):
 ```
 
 ```python
-day_cmap = pt.make_cmap_from_cm(len(exp_days), cmap='rainbow', cmap_low=0, cmap_high=1)
-
 fig, ax = plt.subplots(1,2,figsize=(7,3.5))
 
 ax[0].hlines(0, reward_dist_exclusive_list[0], reward_dist_exclusive_list[-1], 
@@ -821,6 +819,8 @@ ax[1].hlines(sp.special.logit(0.001), reward_dist_exclusive_list[0], reward_dist
              linestyle=':', color='grey', linewidth=0.5)
 ax[0].set_xlabel('exclusion distance (cm)')
 ax[0].set_ylabel('frac. cells above chance')
+ax[1].set_ylabel('frac. cells above chance (logit)')
+
 
 first_vals = np.array([])
 last_vals = np.array([])
@@ -853,11 +853,12 @@ if save_figures:
 ```
 
 ```python
+# write source data to csv
 df_ = pd.DataFrame({'exclusion_distance': reward_dist_exclusive_list,
               'frac_first_switch': first_vals, 
               'frac_last_switch': last_vals
              })
-ut.write_source_csv(df_, '2i')
+# ut.write_source_csv(df_, '2i')
 ```
 
 ### Quantify fraction of cells following vs. preceding the start of the reward zone, at each exclusion
@@ -867,19 +868,17 @@ post_sw_peaks_after = {}
 post_sw_peaks_before = {}
 fraction_after = {}
 fraction_before = {}
-reward_dist_exclusive_list = np.arange(10,200,10)
+reward_dist_exclusive_list = np.arange(10, 200, 10)
 
 fraction_after_v_before = pd.DataFrame({'mouse': np.repeat(include_ans, len(exp_days)*len(reward_dist_exclusive_list)*2),
                                         'day': np.tile(np.repeat(exp_days, len(reward_dist_exclusive_list)*2), len(include_ans)),
-                                        'switch': np.tile(np.repeat(np.arange(1,8), len(reward_dist_exclusive_list)*2), len(include_ans)),
+                                        'switch': np.tile(np.repeat(np.arange(1, 8), len(reward_dist_exclusive_list)*2), len(include_ans)),
                                         'exc_dist': np.tile(np.repeat(reward_dist_exclusive_list, 2), len(include_ans)*len(exp_days)),
                                         'location': np.tile(['before', 'after'], len(include_ans)*len(exp_days)*len(reward_dist_exclusive_list)),
                                         'fraction': np.zeros((len(reward_dist_exclusive_list)*len(exp_days)*len(include_ans)*2,))*np.nan,
                                         # 'fraction_before': np.zeros((len(reward_dist_exclusive_list)*len(exp_days)*len(include_ans)*2,))*np.nan,
                                         'n_cells': np.zeros((len(reward_dist_exclusive_list)*len(exp_days)*len(include_ans)*2,))*np.nan,
-                                       })
-
-
+                                        })
 ```
 
 ```python
@@ -952,6 +951,8 @@ fraction_after_v_before
 ```
 
 ```python
+## Z-test on proportions for the first and last switch day
+
 from statsmodels.stats.proportion import proportions_ztest
 
 count_after = np.zeros((len(include_ans),))*np.nan
@@ -993,16 +994,12 @@ pval[14]
 ```
 
 ```python
-p_thr = 0.05 / len(reward_dist_exclusive_list)
-p_thr
-```
-
-```python
 fig, ax = plt.subplots(2,1, figsize=(10,8))
 
-# sns.boxplot(x='exc_dist', y='fraction', 
-#             data=fraction_after_v_before[fraction_after_v_before['day']==3],
-#             hue='location', dodge=True, notch=True, ax=ax[0], showfliers=False)
+# Bonferroni corrected p-value threshold
+p_thr = 0.05 / len(reward_dist_exclusive_list)
+print(p_thr)
+
 sns.pointplot(x='exc_dist', y='fraction', 
             data=fraction_after_v_before[fraction_after_v_before['day']==3],
               errorbar='se',
@@ -1014,9 +1011,7 @@ ax[0].set_xlabel('exclusion distance (cm)')
 for rde_i, rde in enumerate(reward_dist_exclusive_list):
     stars = pt.convert_pvalue_to_asterisks(pval[3][rde], p_thr=p_thr)
     ax[0].text(x=rde_i, y=0.85, s=stars, fontsize=14)
-# sns.boxplot(x='exc_dist', y='fraction', 
-#             data=fraction_after_v_before[fraction_after_v_before['day']==14],
-#             hue='location', dodge=True, notch=True, ax=ax[1], showfliers=False)
+
 sns.pointplot(x='exc_dist', y='fraction', 
             data=fraction_after_v_before[fraction_after_v_before['day']==14],
               errorbar='se',
@@ -1135,9 +1130,11 @@ all_is_track = np.concatenate(np.asarray(all_is_track))
 all_is_nonrrr = np.concatenate(np.asarray(all_is_nonrrr))
 ```
 
-```python
-# same thing but in track relative coordinates (here we have to compute the xcorr)
+### same thing but in track relative coordinates (here we have to compute the xcorr)
 
+This takes quite a few minutes to run all the cross-correlations
+
+```python
 all_xcp_TR = []
 all_r_vals_TR = []
 all_p_vals_TR = []
@@ -1373,12 +1370,15 @@ for d_i,day in enumerate(exp_days):
 # mean fraction per bins in the 2d histogram above, averaged across days of that condition
 # Create dataframe of fractions
 
+## "near reward"
 reward_switch = np.nanmean(np.concatenate([np.expand_dims(frac_reward[day], axis=1) for day in [
                            3, 5, 7, 10, 12, 14]], axis=1), axis=1, keepdims=True)
 
+## "diagonal"
 diag_switch = np.nanmean(np.concatenate([np.expand_dims(frac_diag[day], axis=1) for day in [
                          3, 5, 7, 10, 12, 14]], axis=1), axis=1, keepdims=True)
 
+## "all other remapping"
 else_switch = np.nanmean(np.concatenate([np.expand_dims(frac_elsewhere[day], axis=1) for day in [
                          3, 5, 7, 10, 12, 14]], axis=1), axis=1, keepdims=True)
 
@@ -1412,7 +1412,7 @@ df_2dhist = pd.DataFrame(data, columns=['Near Reward Stay',
 ```
 
 ```python
-# plot the seaborn way
+# plot violins of the mean fraction per mouse
 
 fig,ax = plt.subplots(1,3,figsize=(7,4),sharey=True)
 
@@ -1446,13 +1446,15 @@ if save_figures:
     fig.savefig(figfile)
 ```
 
-To quantify by "track", "appear", "disappear", "remap-near-reward", and "remap-from-from-reward"  \
-(agnostic of reward-relative designation), run the counter again for all days including stay:
+## Quantify mean fraction of "track", "appear", "disappear", "remap-near-reward", and "remap-from-from-reward" cells
 
-but do NOT "exclude_rr_from_others", as this would mess with the counts on stay days and we're not focusing on reward-relative cells here.
+Agnostic of reward-relative designation! Run the counter again for all days including stay:
+
+but set "exclude_rr_from_others" to `False`, as this would otherwise mess with the counts on stay days and we're not focusing on reward-relative cells here.
 
 ```python
 anim_list = multiDayData[exp_days[-1]].anim_list
+exp_days = [1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14]
 
 df_count = pd.DataFrame(columns=['mouse',
                               'day',
@@ -1524,12 +1526,11 @@ for an in anim_list:
 ```
 
 ```python
-keys = ['track', 'disappear', 'appear', 'reward_inc_rr','nonreward_remap_inc_rr']#, 'rr', 'nonreward_remap']
-# keys.append('summed_remap')
+keys = ['track', 'disappear', 'appear', 'reward_inc_rr','nonreward_remap_inc_rr']
 stay_days = [1,2,4,6,9,11,13]
 switch_win_days = [3,5,7,10,12,14]
 across_day = [8]
-# col_names = np.empty((0,),dtype=str)
+
 col_names = ['mouse','cat']
 [col_names.append(key) for key in keys]
 df_class = pd.DataFrame(columns=col_names, data=np.zeros((3*len(include_ans),
