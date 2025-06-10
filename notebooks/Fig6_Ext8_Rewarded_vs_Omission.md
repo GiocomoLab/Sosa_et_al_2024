@@ -14,17 +14,21 @@ jupyter:
 ---
 
 <!-- #region tags=[] -->
-# Fig 6: Rewarded vs. Omission Trials and Time Warp models
+# Fig 6, Ext Fig 8: Rewarded vs. Omission Trials and Time Warp models
 
 Make sure to first clone and pip install the time warp model repo from Alex Williams:  \
 https://github.com/ahwillia/affinewarp
 <!-- #endregion -->
 
-[Fit time warp model and compute reward vs. omission index](#Loop-omission-analysis-for-all-the-switch-animals-and-days)
+Table of Contents
+
+[Fit time warp model and compute reward vs. omission index](#Loop-omission-analysis-for-all-the-switch-animals-and-days)  \
+[Save model output or load previously saved output](#Save-or-Load-previously-saved-model-outputs)
 
 ```python
 %matplotlib inline
-# inline, widget
+%load_ext autoreload
+%autoreload 2
 
 import math
 import sys
@@ -54,9 +58,6 @@ import TwoPUtils
 
 from affinewarp import ShiftWarping, PiecewiseWarping
 
-
-%load_ext autoreload
-%autoreload 2
 
 save_figures = False
 ```
@@ -92,7 +93,7 @@ max_anim_list = dd.max_anim_list(experiment,exp_days, year='combined')
 ts_key = 'dff' # used to find place field peaks
 
     
-dt = "202504" #"20240530-1141"
+dt = "202504"
 
 pkl_name = "m%s-%s_expdays%s_multiDayData_%s_%s.pickle" % (ut.get_mouse_number(max_anim_list[0]),
                                                            ut.get_mouse_number(
@@ -318,6 +319,7 @@ for day in exp_days:
 
             ## Fit time warping model.
 
+            ## Run this if you want to compare model types
             # models = [
             #     ShiftWarping(smoothness_reg_scale=20.0),
             #     PiecewiseWarping(n_knots=0, warp_reg_scale=1e-6, smoothness_reg_scale=20.0),
@@ -376,26 +378,31 @@ for day in exp_days:
                                                 }
             rew_vs_omiss_vel_mse[day][an]['set 0'] = {'original': ut.compute_MSE_from_matrix(speed_data_in['set 0']),
                                                  'original_rew_vs_omiss_means': np.sum(
-                                                     (speed_rew_mean['set 0']-speed_omiss_mean['set 0'])**2) / speed_rew_mean['set 0'].shape[0],
+                                                     (speed_rew_mean['set 0']-speed_omiss_mean['set 0'])**2
+                                                 ) / speed_rew_mean['set 0'].shape[0],
                                                  'model': np.zeros((len(models),))*np.nan
                                                 }
             rew_vs_omiss_vel_mse[day][an]['set 1'] = {'original': ut.compute_MSE_from_matrix(speed_data_in['set 1']),
                                                  'original_rew_vs_omiss_means': np.sum(
-                                                     (speed_rew_mean['set 1']-speed_omiss_mean['set 1'])**2) / speed_rew_mean['set 1'].shape[0],
+                                                     (speed_rew_mean['set 1']-speed_omiss_mean['set 1'])**2
+                                                 ) / speed_rew_mean['set 1'].shape[0],
                                                  'model': np.zeros((len(models),))*np.nan
                                                 }
             
             # Compute the (mean squared error) MSE of warped velocity from each model
             for m in range(len(models)):
                 mse = ut.compute_MSE_from_matrix(transformed_vel[m], axis=0)
-                rew_vs_omiss_vel_mse[day][an][use_set]['model'][m] = mse #ut.compute_MSE_from_matrix(transformed_vel[m])
+                rew_vs_omiss_vel_mse[day][an][use_set]['model'][m] = mse
                 
                 if plot_speed:
-                    pt.plot_overlaid_traces(ax[m+1],transformed_vel[m][rew_trials[use_set]], xvalues=omiss_bin_centers,
+                    pt.plot_overlaid_traces(ax[m+1],transformed_vel[m][rew_trials[use_set]], 
+                                            xvalues=omiss_bin_centers,
                                            cmap=cmap_rew, alpha=0.6)
-                    pt.plot_overlaid_traces(ax[m+1],transformed_vel[m][omiss_trials[use_set]], xvalues=omiss_bin_centers,
+                    pt.plot_overlaid_traces(ax[m+1],transformed_vel[m][omiss_trials[use_set]], 
+                                            xvalues=omiss_bin_centers,
                                            cmap=cmap_omiss)
-                    ax[m+1].plot(omiss_bin_centers,np.nanmean(transformed_vel[m],axis=0).squeeze(), 'k', label='mean')
+                    ax[m+1].plot(omiss_bin_centers,np.nanmean(transformed_vel[m],axis=0).squeeze(), 
+                                 'k', label='mean')
 
                     ax[m+1].set_title(f"{models[m].warp_type} MSE={mse:.2f}")
             
@@ -403,7 +410,8 @@ for day in exp_days:
                 ax[m+1].legend()
                 ax[0].set_ylabel('velocity (cm/s)')
                 fig.suptitle('%s, day %d, rew-vs-omiss MSE %.2f' % (an, day,
-                                                                    rew_vs_omiss_vel_mse[day][an][use_set]['original_rew_vs_omiss_means']
+                                                                    rew_vs_omiss_vel_mse[day][an][use_set][
+                                                                        'original_rew_vs_omiss_means']
                                                                    )
                             )
                 if save_figures:
@@ -486,7 +494,9 @@ for day in exp_days:
                                         )
 
                     if save_figures:
-                        figfile = os.path.join(fig_dir,"%s_expday%d_meanSEMrewarded-vs-omission_rrCells_set%s_pw3only.pdf" % (
+                        figfile = os.path.join(
+                            fig_dir,
+                            "%s_expday%d_meanSEMrewarded-vs-omission_rrCells_set%s_pw3only.pdf" % (
                             an,day, s[-1]
                         ))
                         fig.savefig(figfile)
@@ -581,7 +591,9 @@ for day in exp_days:
                                         )
 
                     if save_figures:
-                        figfile = os.path.join(fig_dir,"%s_expday%d_afterReward_meanSEMrewarded-vs-omission_rrCells_set%s_TimeWarp_pw3only.pdf" % (
+                        figfile = os.path.join(
+                            fig_dir,
+                            "%s_expday%d_afterReward_meanSEMrewarded-vs-omission_rrCells_set%s_TimeWarp_pw3only.pdf" % (
                             an,day, use_set[-1]
                         ))
                         fig.savefig(figfile)
@@ -614,8 +626,10 @@ cell = 521#77
 fig, ax = plt.subplots(2,2,figsize=(5,6))
 ax[0,0].imshow(speed_data_in['set 0'], aspect = 'auto', cmap='viridis')
 h1=ax[0,1].imshow(transformed_vel[best_model], aspect = 'auto', cmap='viridis')
-ax[1,0].imshow(neural_data_in['set 0'][:,:,np.where(after_reward==cell)[0][0]], aspect = 'auto', cmap='magma')
-h2=ax[1,1].imshow(transformed_neural[best_model][:,:,np.where(after_reward==cell)[0][0]], aspect = 'auto', cmap='magma')
+ax[1,0].imshow(neural_data_in['set 0'][:,:,np.where(after_reward==cell)[0][0]], 
+               aspect = 'auto', cmap='magma')
+h2=ax[1,1].imshow(transformed_neural[best_model][:,:,np.where(after_reward==cell)[0][0]], 
+                  aspect = 'auto', cmap='magma')
 
 pt.colorbar(h1)
 pt.colorbar(h2)
@@ -635,14 +649,14 @@ exp_days = [3, 5, 7, 8, 10, 12, 14]
 
 rgb_tuples = pt.get_anim_colors(len(anim_list))
 
-#data per session
+# data per session
 df = pd.DataFrame(columns=['mouse', 'day', 'n_omiss', f'RO_index_median_set{use_set[-1]}',
-                           'orig_vel_mse_set0', 'orig_rew_vs_om_vel_mse_set0', 
+                           'orig_vel_mse_set0', 'orig_rew_vs_om_vel_mse_set0',
                            f'best_model_vel_mse_set{use_set[-1]}',
                            'orig_vel_mse_set1', 'orig_rew_vs_om_vel_mse_set1',
                            'best_model', 'rzone'])
 
-#data per cell
+# data per cell
 df_cells = pd.DataFrame(columns=['mouse', 'day', 'cell_ids', 'RO_index'])
 
 for an_i, an in enumerate(anim_list):
@@ -650,41 +664,45 @@ for an_i, an in enumerate(anim_list):
 
         anim_colors = pt.get_anim_colors(
             list(anim_list).index(an))
-        if (~np.all(np.isnan(rew_vs_omiss_index[day][an]['RO_index']) )):
- 
+        if (~np.all(np.isnan(rew_vs_omiss_index[day][an]['RO_index']))):
 
             df_this_day = pd.DataFrame({'mouse': an,
                                         'day': day,
                                         'n_omiss': rew_vs_omiss_index[day][an]['n_omiss'],
-                                        f'RO_index_median_set{use_set[-1]}': np.nanmedian(rew_vs_omiss_index[day][an]['RO_index']),
+                                        f'RO_index_median_set{use_set[-1]}': np.nanmedian(
+                                            rew_vs_omiss_index[day][an]['RO_index']),
                                         'orig_vel_mse_set0': rew_vs_omiss_vel_mse[day][an]['set 0']['original'],
-                                        'orig_rew_vs_om_vel_mse_set0': rew_vs_omiss_vel_mse[day][an]['set 0']['original_rew_vs_omiss_means'],
+                                        'orig_rew_vs_om_vel_mse_set0': rew_vs_omiss_vel_mse[day][an]['set 0'][
+                                            'original_rew_vs_omiss_means'],
                                         'orig_vel_mse_set1': rew_vs_omiss_vel_mse[day][an]['set 1']['original'],
-                                        'orig_rew_vs_om_vel_mse_set1': rew_vs_omiss_vel_mse[day][an]['set 1']['original_rew_vs_omiss_means'],
-                                        f'best_model_vel_mse_set{use_set[-1]}': rew_vs_omiss_vel_mse[day][an][use_set]['model'][
+                                        'orig_rew_vs_om_vel_mse_set1': rew_vs_omiss_vel_mse[day][an]['set 1'][
+                                            'original_rew_vs_omiss_means'],
+                                        f'best_model_vel_mse_set{use_set[-1]}': rew_vs_omiss_vel_mse[day][an][
+                                            use_set]['model'][
                                             rew_vs_omiss_index[day][an]['best_model']],
                                         'best_model': rew_vs_omiss_index[day][an]['best_model'],
-                                       'rzone': multiDayData[day].rzone_label[an][use_set]
-                                       },
+                                        'rzone': multiDayData[day].rzone_label[an][use_set]
+                                        },
                                        index=[0]
                                        )
-            
+
             n_entries = len(rew_vs_omiss_index[day][an]['RO_index'])
             mouse_arr = np.repeat(an, n_entries)
             day_arr = np.repeat(day, n_entries)
-            
+
             df_cells_this_day = pd.DataFrame({'mouse': mouse_arr,
-                                        'day': day_arr,
-                                        'cell_ids': rew_vs_omiss_index[day][an]['cell_ids'],
-                                        'RO_index': rew_vs_omiss_index[day][an]['RO_index'],
-                                             }
-                                       )
-            
+                                              'day': day_arr,
+                                              'cell_ids': rew_vs_omiss_index[day][an]['cell_ids'],
+                                              'RO_index': rew_vs_omiss_index[day][an]['RO_index'],
+                                              }
+                                             )
+
         else:
 
             df_this_day = pd.DataFrame({'mouse': an,
                                         'day': float(day),
-                                        'n_omiss': np.nan, #rew_vs_omiss_index[day][an]['n_omiss'],
+                                        # rew_vs_omiss_index[day][an]['n_omiss'],
+                                        'n_omiss': np.nan,
                                         f'RO_index_median_set{use_set[-1]}': np.nan,
                                         'orig_vel_mse_set0': np.nan,
                                         'orig_rew_vs_om_vel_mse_set0': np.nan,
@@ -693,17 +711,15 @@ for an_i, an in enumerate(anim_list):
                                         f'best_model_vel_mse_set{use_set[-1]}': np.nan,
                                         'best_model': np.nan,
                                         'rzone': multiDayData[day].rzone_label[an][use_set]
-                                       },
+                                        },
                                        index=[0]
                                        )
             continue
 
         df = df.append(df_this_day,
-                        ignore_index=True)
+                       ignore_index=True)
         df_cells = df_cells.append(df_cells_this_day,
-                        ignore_index=True)
-                     
-
+                                   ignore_index=True)
 ```
 
 ```python
@@ -719,7 +735,8 @@ for day in [14]:
     for an in anim_list:
         if np.all(~np.isnan(rew_vs_omiss_index_original[day][an]['RO_index'])):
             fig, ax = plt.subplots()
-            this_model_RO = dfs_set0_tmp[1]['RO_index'][(dfs_set0_tmp[1]['day']==day) & (dfs_set0_tmp[1]['mouse']==an)]
+            this_model_RO = dfs_set0_tmp[1]['RO_index'][(dfs_set0_tmp[1]['day']==day
+                                                        ) & (dfs_set0_tmp[1]['mouse']==an)]
             ax.scatter(rew_vs_omiss_index_original[day][an]['RO_index'], this_model_RO, color='black', alpha=0.5)
             ax.plot([-1,1],[-1,1], '--', color='grey')
             r,p = sp.stats.pearsonr(rew_vs_omiss_index_original[day][an]['RO_index'], this_model_RO)
@@ -737,13 +754,13 @@ for day in [14]:
                     an, day))
 ```
 
-## Load/save previously saved model outputs
+## Save or Load previously saved model outputs
 
 The intention here is for you to run to the model above separately for both set 0 and set 1,  \
 then save the outputs to pickles after making the data frame  \
 then load them back in together to do the plotting below.
 
-[Go to set 1](#Set-1)
+[Go to loading set 1](#Set-1)
 
 ```python
 ## SAVE dataframe!!
@@ -751,7 +768,8 @@ definitely_save = False  ## last check!
 if definitely_save:
     pickle_dir = '/data/2P/pickle_scratch'
     exp_days = [3,5,7,8,10,12,14]
-    name = '%s_expday%s_Rew-vs-Omiss_df_set%s_pw3only' % (ut.make_anim_tag(anim_list), ut.make_day_tag(exp_days), use_set[-1])
+    name = '%s_expday%s_Rew-vs-Omiss_df_set%s_pw3only' % (ut.make_anim_tag(anim_list), 
+                                                          ut.make_day_tag(exp_days), use_set[-1])
     save_file = open(os.path.join(pickle_dir, name + '.pickle'), "wb")
     dill.dump((df,df_cells), save_file)
     # Close the pickle
@@ -764,13 +782,14 @@ trial_set = 0
 pickle_dir = '/data/2P/pickle_scratch'
 exp_days = [3,5,7,8,10,12,14]
 load_anim_list = multiDayData[exp_days[-1]].circ_rel_stats_across_an['include_ans']
-name = '%s_expday%s_Rew-vs-Omiss_df_set%s_pw3only' % (ut.make_anim_tag(load_anim_list), ut.make_day_tag(exp_days), trial_set)
+name = '%s_expday%s_Rew-vs-Omiss_df_set%s_pw3only' % (ut.make_anim_tag(load_anim_list), 
+                                                      ut.make_day_tag(exp_days), trial_set)
 dfs_set0 = dill.load(open(os.path.join(pickle_dir, name + '.pickle'), "rb"))
 ```
 
 ```python
 ## Use this only if you tried different model types and want to quantify how often
-## each one was the best
+## each one was the best fit
 
 model_range = np.arange(0,len(models)+1,1)-0.5
 fig,ax = plt.subplots()
@@ -791,10 +810,15 @@ dfs_set0[0]['mouse'].unique()
 ```
 
 ```python
-include_ans = dfs_set0[0]['mouse'].unique() #['GCAMP3','GCAMP4','GCAMP7','GCAMP11','GCAMP12','GCAMP13','GCAMP14']
+include_ans = dfs_set0[0]['mouse'].unique()
 ```
 
+## Plot and quantify set 0
+
 ```python
+## Compare MSE of the model fit vs. the raw data
+## Black outlines are sessions with reward at location "A" or "B"
+
 import pingouin
 
 fig3, ax3 = plt.subplots(1,3,figsize=(12, 4))
@@ -890,10 +914,6 @@ if save_figures:
 ```
 
 ```python
-len(dfs_set0[0]), len(dfs_set0_sess_AB)
-```
-
-```python
 # Convert 'Category' column to Categorical with custom order
 dfs_set0_sess_AB['mouse'] = pd.Categorical(dfs_set0_sess_AB['mouse'], categories=include_ans, ordered=True)
 dfs_set0[0]['mouse'] = pd.Categorical(dfs_set0[0]['mouse'], categories=include_ans, ordered=True)
@@ -940,7 +960,8 @@ if save_figures:
 
 ```python
 ## reduce cells df to AB sessions only
-check = dfs_set0[1][['mouse','day']].apply(tuple,axis=1).isin(dfs_set0_sess_AB[['mouse','day']].apply(tuple,axis=1))
+check = dfs_set0[1][['mouse','day']].apply(tuple,axis=1).isin(
+    dfs_set0_sess_AB[['mouse','day']].apply(tuple,axis=1))
 test = dfs_set0[1][['mouse','day']].loc[check].drop_duplicates(keep='first')
 dfs_set0_cells_AB = dfs_set0[1].loc[check]
 ```
@@ -1026,9 +1047,10 @@ print(lmm_AB.wald_test_terms())
 ```
 
 ```python
-dfs_sess_to_save = dfs_set0_sess_AB[['mouse','day','orig_rew_vs_om_vel_mse_set0','best_model_vel_mse_set0']]
+dfs_sess_to_save = dfs_set0_sess_AB[['mouse','day','orig_rew_vs_om_vel_mse_set0','best_model_vel_mse_set0',
+                                    'RO_index_median_set0']]
 dfs_sess_to_save['switch'] = np.array([exp_days.index(d) for d in dfs_sess_to_save['day'].values])+1
-dfs_sess_to_save
+dfs_sess_to_save.head()
 ```
 
 ```python
@@ -1038,7 +1060,7 @@ dfs_sess_to_save
 ```python
 ## Plot LMM and regression for AB set 0 sessions
 
-fig, ax = plt.subplots(1,1, figsize = (5,5))
+fig, ax = plt.subplots(1,1, figsize = (7,5))
 sns.stripplot(x='day',y='RO_index_median_set0', hue='mouse', data=dfs_set0_sess_AB, jitter=0.15, 
               palette='tab10', size=8, alpha=0.6, ax=ax)
 sns.lineplot(x=dfs_set0_sess_AB['day'].rank(method='dense') - 1,
@@ -1047,6 +1069,7 @@ sns.lineplot(x=dfs_set0_sess_AB['day'].rank(method='dense') - 1,
              color='grey', ax=ax)
 ax.set_ylim([-0.1, 0.5])
 ax.set_title('AB, FE=day*orig_rew_vs_om_vel_mse_set0*best_model_vel_mse_set0')
+sns.move_legend(ax, "upper left", bbox_to_anchor=(1.05, 1))
 
 
 save_figures=False
@@ -1059,7 +1082,7 @@ if save_figures:
 # Set 1
 
 ```python
-## Load data from model run from set0 trials
+## Load data from model run from set1 trials
 trial_set = 1
 pickle_dir = '/data/2P/pickle_scratch'
 exp_days = [3,5,7,8,10,12,14]
@@ -1069,7 +1092,7 @@ dfs_set1 = dill.load(open(os.path.join(pickle_dir, name + '.pickle'), "rb"))
 ```
 
 ```python
-dfs_set1[0]
+dfs_set1[0].head()
 ```
 
 ```python
