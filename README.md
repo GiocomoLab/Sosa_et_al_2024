@@ -49,7 +49,7 @@ If creating a conda env from these yamls doesn't work (it may not work on differ
   For example:
 
 ```bash
-conda env create --name <envname> python=3.8.5
+conda create --name <envname> python=3.8.5
 conda install h5py=2.10.0 numpy=1.22.5 numba=0.51.2
 conda install scipy=1.7.3 pandas=1.1.3
 conda install <anotherpackage>
