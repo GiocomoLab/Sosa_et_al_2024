@@ -15,17 +15,26 @@ jupyter:
 
 # Fig 8: Timing of neural remapping and behavioral updates
 
-Use factorized K-means to identify clusters of the pre-switch and post-swith maps,  \
-then compute a distance score for every trial from each cluster,  \
+Use factorized K-means to identify clusters of the pre-switch and post-switch maps,  \
+then compute a distance score for every trial, measuring the trial-by-trial distance  \
+of the neural activity from the cluster centroid for each map,  \
 then fit sigmoids to identify the remap trial as the inflection point.
 
 Requires open source code by Alex Williams and Isabel Low used in  \
 Low et al. Giocomo, 2021:
 https://github.com/ahwillia/lvl
 
+
+### Table of Contents
+
+[Load multiDayData, where cells have already been classified by remapping type](#Load-pre-saved-multiDayData)  \
+[Run K-means and Distance Score](#Run-K-Means-and-Distance-Score)  \
+[Plotting](#Plotting) 
+
 ```python tags=[]
 %matplotlib inline
-# inline, widget
+%load_ext autoreload
+%autoreload 2
 
 import math
 import sys
@@ -64,9 +73,6 @@ from sklearn.impute import KNNImputer
 # from dask.diagnostics import ProgressBar
 # from scipy.optimize import curve_fit
 
-%load_ext autoreload
-%autoreload 2
-
 save_figures = False
 ```
 
@@ -87,7 +93,7 @@ pt.set_fig_params(fontsize=12)
 ```
 
 <!-- #region tags=[] -->
-## Load saved multiDayData
+## Load pre-saved multiDayData
 
 If you want to create a new multiDayData, use the notebook Run_dayData_class.ipynb and save the pickle first.
 <!-- #endregion -->
@@ -100,7 +106,7 @@ max_anim_list = dd.max_anim_list(experiment,exp_days, year='combined')
 ts_key = 'dff' # used to find place field peaks
 
     
-dt = "202504" #"20240530-1141"
+dt = "202504"
 
 pkl_name = "m%s-%s_expdays%s_multiDayData_%s_%s.pickle" % (ut.get_mouse_number(max_anim_list[0]),
                                                            ut.get_mouse_number(
@@ -120,7 +126,7 @@ max_anim_list = sorted(np.unique(np.concatenate([multiDayData[day].anim_list
                            key=len)
 ```
 
-# Run KMeans and Distance score
+# Run K-Means and Distance Score
 
 Using Isabel/Alex distance score and fitting a sigmoid to compare timing of remapping vs. behavior
 
@@ -135,8 +141,6 @@ from lvl.factor_models import KMeans as lvl_kmeans
 from scipy.spatial.distance import pdist, squareform
 
 ```
-
-## Run Kmeans and Distance Score
 
 Takes ~9-10 hours to run through the whole dataset.
 
@@ -193,6 +197,7 @@ for day in exp_days:
 
         # norm to max (scale between 0 and 1)
         L = (L - np.nanmin(L))/(np.nanmax(L) - np.nanmin(L))
+        # create correlation matrix
         lick_sim = spatial.corr_mat(L)
 
         # kmeans for licking
@@ -210,9 +215,11 @@ for day in exp_days:
         # impute nans from low sampling
         imputer = KNNImputer(n_neighbors=3)
         S = imputer.fit_transform(S)
+        # norm to max (scale between 0 and 1)
         S = (S - np.nanmin(S))/(np.nanmax(S) - np.nanmin(S))
+        # create correlation matrix
         speed_sim = spatial.corr_mat(S)
-        # norm to max, kmeans
+        # compute kmeans for speed
         speed_model_kmeans = lvl_kmeans(n_components=2, n_restarts=100)
         speed_model_kmeans.fit(S)
         W_speed, H_speed = speed_model_kmeans.factors
@@ -231,8 +238,8 @@ for day in exp_days:
             multiDayData[day].trial_dict[an]['trial_set0'], i].astype(int))
         ) for i in range(W_lick.shape[1])]
         zero_cluster = most_freq_cluster_id.index(0)
-        # print('lick',zero_cluster)
-        # if zero cluster position is not 0 (i.e. first), swap the order
+        
+        # if zero cluster position is not 0 (i.e. first), swap the assignments
         if zero_cluster != 0:
             print('swapping lick cluster')
             # flip map indices too
@@ -244,16 +251,18 @@ for day in exp_days:
             multiDayData[day].trial_dict[an]['trial_set0'], i].astype(int))
         ) for i in range(W_speed.shape[1])]
         zero_cluster = most_freq_cluster_id.index(0)
-        # if zero cluster position is not 0 (i.e. first), swap the order
+        # if zero cluster position is not 0 (i.e. first), swap the assignments
         if zero_cluster != 0:
             print('swapping speed cluster')
             # flip map indices too
             W_speed = ~(W_speed.astype(bool))*1
             H_speed = np.flipud(H_speed)
         map_0_index = 0
-
+        
+        # Start collecting outputs in the 'dist_score' dictionary
         dist_score[day][an]['lick']['sim'] = lick_sim
         dist_score[day][an]['speed']['sim'] = speed_sim
+        # Compute actual distance score for licking and speed
         dist_score[day][an]['lick']['dist'] = kds.clu_distance_population(
             L, H_lick, map_0_index)
         dist_score[day][an]['speed']['dist'] = kds.clu_distance_population(
@@ -323,6 +332,9 @@ for day in exp_days:
                 Y_[:, :, c] = (Y_[:, :, c] - np.nanmin(Y_[:, :, c])
                                )/(np.nanmax(Y_[:, :, c]) - np.nanmin(Y_[:, :, c]))
 
+            # Do K-means and check whether the clustering is best explained by one map or not
+            # If best explained by one map (i.e. couldn't find reliable clusters,
+            # we'll exclude that session
             best_k, r2, one_map = kds.optimal_k(Y_,  max_k=max_k,
                                                 k_reps=20, shuffle_reps=50,
                                                 alpha=0.05, verbose=True,
@@ -334,6 +346,8 @@ for day in exp_days:
 
             # Y_sim_vec = np.abs(pdist(Y_unwrapped, 'correlation')-1)
             # Y_sim = squareform(Y_sim_vec)
+            
+            # Corr mat with normalization
             Y_sim = spatial.corr_mat(spatial.population_vector(Y_, axis=1))
 
             # for plotting, nan out diagonal
@@ -341,7 +355,6 @@ for day in exp_days:
                              Y_pv_corr.shape[0]).astype(bool)] = np.nan
             Y_sim[np.eye(Y_sim.shape[0], Y_sim.shape[0]).astype(bool)] = np.nan
 
-            # max normalized first
             dist_score[day][an]['pv'][ct]['sim'] = Y_sim
             dist_score[day][an]['pv'][ct]['corr_mat'] = Y_pv_corr
             dist_score[day][an]['pv'][ct]['k'] = best_k
@@ -356,7 +369,7 @@ for day in exp_days:
                 # fit is happening at the "optimal k" which could be >2 if you're exploring other k,
                 # where here it is forced to be 2
                 model_kmeans = lvl_kmeans(n_components=2, n_restarts=100)
-                model_kmeans.fit(Y_unwrapped)  # Y_pv_corr)
+                model_kmeans.fit(Y_unwrapped)
                 W, H = model_kmeans.factors
 
                 # assign first cluster in session as zero
@@ -364,7 +377,7 @@ for day in exp_days:
                     multiDayData[day].trial_dict[an]['trial_set0'], i].astype(int))
                 ) for i in range(W.shape[1])]
                 zero_cluster = most_freq_cluster_id.index(0)
-                # if zero cluster position is not 0 (i.e. first), swap the order
+                # if zero cluster position is not 0 (i.e. first), swap the assignments
                 if zero_cluster != 0:
                     print('swapping neural cluster')
                     # flip map indices too
@@ -427,6 +440,9 @@ for day in exp_days:
             
 print(f"{len(is_one_map) - np.sum(is_one_map)} sessions accepted as k=2 out of {len(is_one_map)}")
 ```
+
+# Plotting
+
 
 ## Plot correlation matrices and sigmoids for a given cell type (Fig. 8a-d)
 
@@ -531,6 +547,8 @@ for day in [3, 7]:  # dist_score.keys():
                 extension='.pdf')
 ```
 
+## Quantify remap trials
+
 ```python
 # only for sessions with a successful sigmoidal fit,
 # look at the distribution of remap trials
@@ -615,6 +633,7 @@ sigmoid_df
 ```
 
 ```python
+# Make a separate dataframe for each celltype for convenient stats
 rr_df = sigmoid_df[['mouse','day','switch','ct','sess_id','switch_dir','datatype','remap_trial']]
 rr_df = rr_df[(rr_df['ct']=='RR')]
 
@@ -707,12 +726,6 @@ if save_figures:
 ```
 
 ```python
-#Much simpler method to compare celltypes and correct for multiple comparisons:
-pingouin.pairwise_ttests(data=sigmoid_df, dv='remap_trial', within='ct', subject='sess_id', parametric=False,
-                         padjust='bonferroni')
-```
-
-```python
 lmm_ct.pvalues[1:-1]
 ```
 
@@ -727,24 +740,9 @@ ser
 ```
 
 ```python
-def likelihood_ratio_test(m_full, m_null):
-    
-    # degrees of freedom = difference in number of parameters between the 2 models
-    deg = len(m_full.params)-len(m_null.params)
-    LRT = 2*(m_full.llf-m_null.llf)
-    pval = sp.stats.chi2.sf(LRT, deg)
-    print(f"LRT = {LRT:0.2f}; pval={pval:1.2e}")
-    print(f"m_full conv: {str(m_full.converged)}, m_null conv: {str(m_null.converged)}")    
-
-    return LRT, pval
-```
-
-```python
-def assess_model_fit(m_full):
-    print(f"Scale or sigma2 = {m_full.scale:0.2f}")
-    print(f"SSR = {np.sum(m_full.resid**2):0.2f}")
-    print(f"Var = {np.var(m_full.resid):0.2f}")
-    print(f"effective fitted parameters: {m_full.nobs - np.sum(m_full.resid**2)/m_full.scale:0.2f}")
+#Much simpler alternative method to compare celltypes and correct for multiple comparisons:
+pingouin.pairwise_ttests(data=sigmoid_df, dv='remap_trial', within='ct', subject='sess_id', parametric=False,
+                         padjust='bonferroni')
 ```
 
 ## Main LMMs and violin plots for Fig. 8, Ext Fig. 10
@@ -756,26 +754,14 @@ use_df = sigmoid_df[(sigmoid_df['ct']==ct)]
 
 # Note groups are 'mouse' instead of 'sess_id' as the session id is
 # already accounted for by including 'switch' as a continuous fixed effect
+# Note results were also significant with switch as a categorical fixed effect
 
 lmm = smf.mixedlm('remap_trial ~ 1 + C(datatype,Treatment("pv"))*C(switch_dir) + switch', groups='mouse', # 
                    re_formula = '~1', 
                   data=use_df,
-                  missing='drop').fit(reml=True) # also sig with switch as categorical
+                  missing='drop').fit(reml=True)
 
 print(lmm.summary(), lmm.wald_test_terms(), lmm.pvalues)
-
-## LRT
-
-m_full = smf.mixedlm('remap_trial ~ 1 + C(datatype,Treatment("pv"))*C(switch_dir)*switch', groups='mouse',
-                   re_formula='1', 
-                   data=use_df).fit(reml=False)
-m_null = smf.mixedlm('remap_trial ~ 1 + C(datatype,Treatment("pv"))*C(switch_dir) + 1', groups='mouse',
-                   re_formula='1', 
-                   data=use_df).fit(reml=False)
-
-# likelihood_ratio_test(m_full, m_null)
-# print(assess_model_fit(m_full))
-# print(assess_model_fit(m_null))
 
 # no effect of switch day, can get rid of it here
 print("--backward - ref licking --")
@@ -834,10 +820,11 @@ ser
 ```
 
 ```python
+## Plot violins
+
 cmap = pt.make_cmap_from_cm(len(include_ans), cmap='Greys_r',
                             cmap_low=0.1, cmap_high=0.3)
-# cmap = pt.make_cmap_from_cm(len(include_ans), cmap='tab10',
-#                             cmap_low=0, cmap_high=1)
+
 fig, ax = plt.subplots(1, 2, figsize=(28, 14), sharey=True)
 style = 'violin'
 by = 'session'  # 'session'
@@ -935,7 +922,7 @@ forward_df = sigmoid_df[(sigmoid_df['switch_dir']=='forward') & (sigmoid_df['dat
 backward_df = sigmoid_df[(sigmoid_df['switch_dir']=='backward') & (sigmoid_df['datatype']=='pv') & (sigmoid_df['ct']=='RR')]
 n_forward_sess = int(len(forward_df))
 n_backward_sess = int(len(backward_df))
-# forward_df
+
 ```
 
 ```python

@@ -75,7 +75,7 @@ exp_days = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
 
 for mouse in anim_list:
     sess_inds = []
-    if mouse in sessions_dict.single_plane.keys(): # for some reason multiplane animals are also being included in single plane dict
+    if mouse in sessions_dict.single_plane.keys():
         use_dict = sessions_dict.single_plane
     elif mouse in sessions_dict.multi_plane.keys():
         use_dict = sessions_dict.multi_plane
@@ -185,8 +185,6 @@ common_rois.shape
 You can run this if you've already saved the pickle of matched ROIs to disk.
 
 ```python
-## calculate dff
-
 from reward_relative import preprocessing as pp
 
 exp_days = [1,2]
@@ -200,6 +198,7 @@ for day in exp_days:
     trial_starts =  sess_subset[day].trial_start_inds
     teleports =  sess_subset[day].teleport_inds
 
+    # Calculate df/f
     baseline_method = 'maximin'
     #options are maximin, maxsmooth, amd maximin_concat
     F =  sess_subset[day].timeseries['F']
@@ -231,7 +230,7 @@ common_rois
 ```
 
 ```python
-# pick of cell of interest (COI) and plot
+# pick cell of interest (COI) and plot
 
 rrel.plotUtils.set_fig_params(fontsize=8)
 from reward_relative import placeCellPlot

@@ -31,17 +31,14 @@ https://github.com/GiocomoLab/Low_etal_2021
 
 ```python
 %matplotlib inline
-# inline, widget
+%load_ext autoreload
+%autoreload 2
 
-import math
-import sys
 import os
-# import pickle
 import dill
 import numpy as np
 import scipy as sp
 import pandas as pd
-import warnings
 from tqdm import tqdm
 import copy
 
@@ -63,9 +60,6 @@ from reward_relative import decode
 import TwoPUtils
 
 import sklearn
-
-%load_ext autoreload
-%autoreload 2
 
 save_figures = False
 ```
@@ -131,18 +125,19 @@ multiDayData = multiDayDataSub
 
 ## Get continuously sampled data
 
+And find downsampled indices to match position occupancy between trial sets
+
 [Table of contents](#Table-of-Contents)
 
 ```python
-days = [3,5,7,8,10,12,14]
-mice = include_ans 
+days = [3, 5, 7, 8, 10, 12, 14]
 
 celltype_inds = {}
 behav_data = {}
 neural_data = {}
-ds = {} # downsampled indices per session
+ds = {}  # downsampled indices per session
 
-match = 'pos' # or 'pos'
+match = 'pos'  # 'pos' or 'speed'; 'pos' used for the paper
 
 
 for day in days:
@@ -157,32 +152,28 @@ for day in days:
     neural_data[day] = {}
     ds[day] = {}
 
-    for an_i, an in enumerate(include_ans): #include_ans):
+    for an_i, an in enumerate(include_ans):  # include_ans):
 
         print("%s day %d" % (an, day))
         # Get timeseries data
-        behav_data[day][an], neural_data[day][an]  = glmUtils.get_timeseries_data(
-                                                all_anim[an]['sess'],
-            data_types=['trials','rel_pos','pos','speed', 'rewards'],
-                                                  rel_pos_type='circular',  # or 'linear'
-                                                  use_speed_thr=2,  # or None, or another value
-                                                  )
-        
-        _, celltype_inds[day][an] = dd.get_cell_class_n(multiDayData, day, an, verbose=False)
-        
-        ''' Downsample to match speed and num observations '''
-        
-        speed = behav_data[day][an]['speed']
+        behav_data[day][an], neural_data[day][an] = glmUtils.get_timeseries_data(
+            all_anim[an]['sess'],
+            data_types=['trials', 'rel_pos', 'pos', 'speed', 'rewards'],
+            rel_pos_type='circular',  # or 'linear'
+            use_speed_thr=2,  # or None, or another value
+        )
+
+        _, celltype_inds[day][an] = dd.get_cell_class_n(
+            multiDayData, day, an, verbose=False)
+
         y = behav_data[day][an]['rel_pos']
 
         # take the same number of trials from each set
-        set0_idx = (behav_data[day][an]['trials'] <= 29).values #before the switch, 0-indexed
-        set1_idx = (behav_data[day][an]['trials'] > 29).values #after the switch
+        # before the switch, 0-indexed
+        set0_idx = (behav_data[day][an]['trials'] <= 29).values
+        set1_idx = (behav_data[day][an]['trials'] >
+                    29).values  # after the switch
 
-        # bin speed into 5cm/s bins
-        edges = np.arange(2, np.max(speed), 5)
-        speed_idx = np.digitize(speed, edges)
-        
         relpos_edges = np.linspace(-np.pi, np.pi, 45)
         relpos_idx = np.digitize(y, relpos_edges)
 
@@ -190,12 +181,18 @@ for day in days:
         all_obs = np.arange(y.shape[0])
 
         # array to hold indices for downsampling
-        ds_all = np.asarray([]) # array to hold indices for downsampling all trials
-        ds_0 = np.asarray([]) # array to hold indices for downsampling map 0
-        ds_1 = np.asarray([]) # array to hold indices for downsampling map 1
+        # array to hold indices for downsampling all trials
+        ds_all = np.asarray([])
+        ds_0 = np.asarray([])  # array to hold indices for downsampling map 0
+        ds_1 = np.asarray([])  # array to hold indices for downsampling map 1
 
         # match occupancy of each bin for each map
-        if match == 'speed': ## option to match by speed, but we used position for the paper
+        if match == 'speed':  # option to match by speed, but we used position for the paper
+             ''' Downsample to match speed and num observations '''
+            speed = behav_data[day][an]['speed']
+            # bin speed into 5cm/s bins
+            edges = np.arange(2, np.max(speed), 5)
+            speed_idx = np.digitize(speed, edges)
             bins, count = np.unique(speed_idx, return_counts=True)
             for b in bins:
                 occupancy_0 = np.sum(set0_idx[speed_idx == b])
@@ -223,14 +220,14 @@ for day in days:
             ds_1 = ds_1.astype(int)
             
         elif match == 'pos':
-            # match the occupancy of each position bin along the track, within each trial set
+            ''' Downsample to match the occupancy of each position bin along the track, within each trial set '''
             bins_all, count_all = np.unique(relpos_idx, return_counts=True)
-            ## for set 0
+            # for set 0
             # match to the minimum occupancy
             bins_0, count_0 = np.unique(relpos_idx[set0_idx], return_counts=True)
             min_occ_0 = np.min(count_0)
             
-            ## for set 1
+            # for set 1
             # match to the minimum occupancy
             bins_1, count_1 = np.unique(relpos_idx[set1_idx], return_counts=True)
             min_occ_1 = np.min(count_1)
@@ -275,7 +272,9 @@ for day in day_subset:
 tinybins = np.linspace(-np.pi, np.pi, 90)
 fig, ax = plt.subplots(2,1, figsize = (5,5))
 
+# top = first switch day
 sns.histplot(data=relpos_deliv[3], bins=tinybins, ax=ax[0], fill=True, stat='probability')
+# bottom = last switch day
 sns.histplot(data=relpos_deliv[14], bins=tinybins, ax=ax[1], fill=True, stat='probability')
 
 ax[0].set_xlim([-np.pi, np.pi])
@@ -303,7 +302,6 @@ from tqdm import trange
 REGULARIZATION = 1e-4
 model = decode.CircularRegression(alpha=REGULARIZATION)
 
-mice = include_ans
 days = exp_days
 
 # X: deconvolved events, timepoints x neurons
@@ -341,14 +339,20 @@ for day in days:
             X[np.isnan(X)] = 0
 
             # get CV scores for each train and test combo
+            
+            # train "before", test "before"
             train0_test0_scores, train0_test0_pred, train0_test0_actual = decode.train_vs_test_blocks(
                 X, y, ds_0, ds_0, model, return_prediction=True)
+            # train "before", test "after"
             train0_test1_scores, train0_test1_pred, train0_test1_actual = decode.train_vs_test_blocks(
                 X, y, ds_0, ds_1, model, return_prediction=True)
+            # train "after", test "after"
             train1_test1_scores, train1_test1_pred, train1_test1_actual = decode.train_vs_test_blocks(
                 X, y, ds_1, ds_1, model, return_prediction=True)
+            # train "after", test "before"
             train1_test0_scores, train1_test0_pred, train1_test0_actual = decode.train_vs_test_blocks(
                 X, y, ds_1, ds_0, model, return_prediction=True)
+            # train and test on random samples from the whole session
             random_scores, random_pred, random_actual = decode.train_vs_test_blocks(
                 X, y, ds_all, ds_all, model, return_prediction=True)
             
@@ -391,7 +395,6 @@ pred_shuffle = {}
 actual_shuffle = {}
 
 ct_list = ['rr', 'track', 'nonreward_remap']
-mice = include_ans
 
 for day in days:
 
@@ -463,23 +466,27 @@ for day in days:
                 time_shift = np.random.uniform(
                     1, max_samp, X.shape[1]).astype(int)
 
-                # train and test on shuffled position data for the same map
+                # train and test on shuffled position data
                 shuff_X = ut.indep_roll(X_all, time_shift, axis=0)
 
+                # train and test on random samples from the whole session
                 shuf_random_scores[j, :], shuf_random_pred[j], shuf_random_actual[j] = decode.train_vs_test_blocks(shuff_X,
                                                                                                                    y, ds_all, ds_all,
                                                                                                                    model,
                                                                                                                    return_prediction=True)
-
+                # train "before", test "before"
                 shuf_train0_test0_scores[j, :], shuf_train0_test0_pred[j], shuf_train0_test0_actual[j] = decode.train_vs_test_blocks(shuff_X, y, ds_0, ds_0,
                                                                                                                                      model,
                                                                                                                                      return_prediction=True)
+                # train "before", test "after"
                 shuf_train0_test1_scores[j, :], shuf_train0_test1_pred[j], shuf_train0_test1_actual[j] = decode.train_vs_test_blocks(shuff_X, y, ds_0, ds_1,
                                                                                                                                      model,
                                                                                                                                      return_prediction=True)
+                # train "after", test "before"
                 shuf_train1_test0_scores[j, :], shuf_train1_test0_pred[j], shuf_train1_test0_actual[j] = decode.train_vs_test_blocks(shuff_X, y, ds_1, ds_0,
                                                                                                                                      model,
                                                                                                                                      return_prediction=True)
+                # train "after", test "after"
                 shuf_train1_test1_scores[j, :], shuf_train1_test1_pred[j], shuf_train1_test1_actual[j] = decode.train_vs_test_blocks(shuff_X, y, ds_1, ds_1,
                                                                                                                                      model,
                                                                                                                                      return_prediction=True)
@@ -602,6 +609,7 @@ for day in days:
                         f'train{tset}_test{test_set}'][fold] - actual[day][an][ct][
                         f'train{tset}_test{test_set}'][fold])
 
+                    # bin decoder score by relative position
                     for ii, (b_start, b_end) in enumerate(zip(relpos_bins[:-1], relpos_bins[1:])):
                         # find which relative positions are in this bin
                         in_bin = ((actual[day][an][ct][
@@ -643,8 +651,6 @@ for day in days:
 ## take the mean z-score for each cell category across animals within a day
 
 ```python
-
-
 zscore_across_an = {}
 fig, ax = plt.subplots(len(exp_days)*2, 3, figsize=(15, 4*len(exp_days)))#, sharey='row')
 fig_bow, ax_bow = plt.subplots(1,3, figsize=(15,3))

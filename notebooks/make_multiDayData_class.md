@@ -21,12 +21,12 @@ reward-relative spatial firing peaks and comparing to a shuffle, for each animal
 Most attributes of dayData have an entry for each animal.
 
 Requires `multi_anim_sess` to already be saved for each day, which is a dictionary containing  \
-the sess data, dF/F, and place cell booleans for each animal. 
+the sess data, dF/F, deconvolved events, and place cell booleans for each animal. 
 
 
 ```python tags=[]
-%matplotlib inline
-# inline, widget
+%load_ext autoreload
+%autoreload 2
 
 import os
 import pickle
@@ -38,10 +38,6 @@ from datetime import datetime
 from reward_relative import utilities as ut
 from reward_relative import dayData as dd
     
-
-%load_ext autoreload
-%autoreload 2
-
 save_figures = False
 ```
 
@@ -132,8 +128,7 @@ with warnings.catch_warnings():
                                            exp_day=exp_day,
                                            experiment=experiment,
                                            # timeseries to use
-                                           ts_key=ts_key,  # to use for analysis, reward cell fractions,
-                                           #                                            # finding place cell peaks
+                                           ts_key=ts_key,  # finding place cell peaks
                                            force_two_sets=True,  # of trials
                                            use_speed_thr=use_speed_thr,
                                            speed_thr=speed_thr,
@@ -158,7 +153,6 @@ with warnings.catch_warnings():
                                                     smooth=smooth,  # whether to smooth for finding place cell peaks
                                                     # (activity will be auto smoothed for everything else)
                                                     impute_NaNs=True,
-
                                                     place_cell_logical=place_cell_logical,
                                                     ts_key=ts_key,
                                                     lick_correction_thr=0.35,

@@ -13,9 +13,12 @@ jupyter:
     name: python3
 ---
 
-# Make sess class for each session and save as pickle
+# Make sess class from raw data for each session and save as pickle
 
-Currently uses info from sessions_dict.py to loop through sessions and create the sess class.
+Run after suite2p curation but before anything else.
+
+Currently uses info from sessions_dict.py to loop through sessions and create the sess class, \
+synchronizing neural data with behavioral data.
 
 sess pickle files will be named `<scene>_<session>_<scan>.pickle`  \
 and saved in `path_dict['preprocessed_root']/sess/<animal>/<date>`.
@@ -41,6 +44,8 @@ import TwoPUtils
 ```
 
 ### Specify your path dictionary here.
+
+Copy and rename `path_dict.py` to a new file and edit it with the paths on your system.
 
 ```python
 from reward_relative.path_dict_firebird import path_dictionary as path_dict
@@ -79,7 +84,7 @@ days
 
 ```python
 basedir = os.path.join(path_dict['preprocessed_root'], animal)
-sbxdir = os.path.join(path_dict['gdrive_root'], animal) #os.path.join(path_dict['sbx_root'], animal) # ['gdrive_root']
+sbxdir = os.path.join(path_dict['sbx_root'], animal)
 vrdir = path_dict['VR_Data']
 
 binary_from_sbxdir = True # only relevant for downsampling
@@ -176,7 +181,6 @@ calcium_exists = True
 add_suite2p = True
 
 for day in days: 
-# day=0
     if type(multi_plane[animal][day]) is not tuple:   
         date = multi_plane[animal][day]['date']
         scene = multi_plane[animal][day]['scene']

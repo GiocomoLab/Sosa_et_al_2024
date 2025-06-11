@@ -15,7 +15,7 @@ jupyter:
 
 # Make multi_anim_sess dictonary:
 
-### Groups sess data from multiple animals on a single day, and calculates dFF, place cells, and trial set dictionary
+### Groups sess data from multiple animals on a single day, and calculates dFF, deconvolved events, place cells, and trial set dictionary
 
 pickle files will be named: \
 `<animal-numbers>_expday<day_number>_speed<thr>_perms<nperms>_<dff-baseline-method>_<timeseries-for-place-cells>.pickle`  \

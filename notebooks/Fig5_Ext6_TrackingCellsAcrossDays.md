@@ -34,7 +34,9 @@ jupyter:
 
 ```python tags=[]
 %matplotlib inline
-# inline, widget
+%load_ext autoreload
+%autoreload 2
+
 import os
 import dill
 import numpy as np
@@ -61,9 +63,6 @@ from reward_relative import placeCellPlot
 from reward_relative import dayData as dd
 from reward_relative import multiDayROIAlign as roiAlign
 from reward_relative import circ
-
-%load_ext autoreload
-%autoreload 2
 
 save_figures = False
 ```
@@ -190,7 +189,6 @@ rdist_to_rad_inc = multiDayData[exp_days[0]
 cats = ['rr', 'pc', 'track', 'nontrack_pc', 'appear',
         'disappear', 'nonreward_remap', 'nonpc']
 
-# currently nonreward_remap would include rr, check how many of these are rr and if rr ended up in any other cats
 for an in anim_list:
     [tracked[an].update({cat: {}}) for cat in cats]
 
@@ -207,246 +205,245 @@ df = pd.DataFrame(columns=['mouse',
                            'frac_pc_becoming_rr',
                            'frac_nonpc_becoming_rr'])
 
-align_days = [3, 5, 7, 8, 10, 12, 14]  # np.arange(1,15)
-combo_list = [2]  # removing combo_list indexing for simplicity
+align_days = [3, 5, 7, 8, 10, 12, 14] 
+n = 2  # to align across groups of 2 switch days
 
 # Iterate through each combo of 2 consecutive switch days
-for n in combo_list:
-    day_slices = ut.subsequences(align_days, n)
+day_slices = ut.subsequences(align_days, n)
 
-    for ds_i, ds in enumerate(day_slices):
-        print(ds_i, ds)
-        common_rois = roiAlign.find_common_rois(anim_list, ds)
-        ref_day = ds[0]
-        targ_day = ds[1]
+for ds_i, ds in enumerate(day_slices):
+    print(ds_i, ds)
+    common_rois = roiAlign.find_common_rois(anim_list, ds)
+    ref_day = ds[0]
+    targ_day = ds[1]
 
-        for an in common_rois.keys():
+    for an in common_rois.keys():
 
-            tracked[an]['day_combo'] = np.zeros((len(day_slices), n))
-            tracked[an]['n_tracked'] = np.zeros((len(day_slices), 1))
-            tracked[an]['n_ref'] = np.zeros((len(day_slices), 1))
-            tracked[an]['frac_tracked'] = np.zeros((len(day_slices), 1))
+        tracked[an]['day_combo'] = np.zeros((len(day_slices), n))
+        tracked[an]['n_tracked'] = np.zeros((len(day_slices), 1))
+        tracked[an]['n_ref'] = np.zeros((len(day_slices), 1))
+        tracked[an]['frac_tracked'] = np.zeros((len(day_slices), 1))
 
-            day_ind = ut.get_ind_of_exp_day(all_sess, an, ref_day)
+        day_ind = ut.get_ind_of_exp_day(all_sess, an, ref_day)
 
-            # Iterate through categories and find which cells were tracked across days
-            for cat in cats:
-                # ['rr','pc','track','appear','disappear','nonreward_remap','nonpc']
-                
-                # IMPORTANT: do 'rr' first, as it will get excluded from all other categories
-                if cat == 'rr':
-                    # reward relative cells
-                    ids = np.copy(
-                        multiDayData[ref_day].reward_rel_cell_ids[an])
-                    if limit_rr_to_and:
-                        ids = ids[np.isin(ids,
-                                          np.where(np.logical_and(
-                                              multiDayData[ref_day].place_cell_masks[an]['set 0'],
-                                              multiDayData[ref_day].place_cell_masks[an]['set 1']
-                                          ))[0])]
-                    rr_ids = np.copy(ids)
-                    print('rr cells', len(rr_ids))
-                elif cat == 'pc': #place cells
-                    # find the pcs that are not rr cells on the ref day
-                    # do this by place cell masks
-                    ids = np.where(np.logical_or(
-                        multiDayData[ref_day].place_cell_masks[an]['set 0'],
-                        multiDayData[ref_day].place_cell_masks[an]['set 1']
+        # Iterate through categories and find which cells were tracked across days
+        for cat in cats:
+            # ['rr','pc','track','appear','disappear','nonreward_remap','nonpc']
+
+            # IMPORTANT: do 'rr' first, as it will get excluded from all other categories
+            if cat == 'rr':
+                # reward relative cells
+                ids = np.copy(
+                    multiDayData[ref_day].reward_rel_cell_ids[an])
+                if limit_rr_to_and:
+                    ids = ids[np.isin(ids,
+                                      np.where(np.logical_and(
+                                          multiDayData[ref_day].place_cell_masks[an]['set 0'],
+                                          multiDayData[ref_day].place_cell_masks[an]['set 1']
+                                      ))[0])]
+                rr_ids = np.copy(ids)
+                print('rr cells', len(rr_ids))
+            elif cat == 'pc': #place cells
+                # find the pcs that are not rr cells on the ref day
+                # do this by place cell masks
+                ids = np.where(np.logical_or(
+                    multiDayData[ref_day].place_cell_masks[an]['set 0'],
+                    multiDayData[ref_day].place_cell_masks[an]['set 1']
+                ))[0]
+                # exclude reward-relative cells
+                ids = ids[~np.isin(ids, rr_ids
+                                   )]
+            elif cat == 'nontrack_pc':
+                # find the pcs that are not rr cells AND not track-relative on the ref day
+                # do this by place cell masks, not "keep" (since that could exclude certain cell types)
+                ids = np.where(np.logical_or(
+                    multiDayData[ref_day].place_cell_masks[an]['set 0'],
+                    multiDayData[ref_day].place_cell_masks[an]['set 1']
+                ))[0]
+                ids = ids[~np.isin(ids, rr_ids
+                                   )]
+                ids = ids[~np.isin(ids, np.where(
+                    multiDayData[ref_day].cell_class[an]['masks']['track'])[0])]
+
+            elif cat in ['track', 'appear', 'disappear']:
+                # find cells that were track-relative, appearing, or disappearing
+                ids = np.where(
+                    multiDayData[ref_day].cell_class[an]['masks'][cat])[0]
+                ids = ids[~np.isin(ids, rr_ids
+                                   )]
+            elif cat == 'nonreward_remap':
+                # specifically nonreward remapping cells that are not reward-relative
+                ids = np.where(
+                    multiDayData[ref_day].cell_class[an]['masks'][cat])[0]
+                # print('frac rr cells out of nonreward_remap:',
+                #       np.sum(np.isin(
+                #           rr_ids,
+                #       ids)) / len(ids)
+                #      )
+                ids = ids[~np.isin(ids, rr_ids
+                                   )]
+            elif cat == 'nonpc':
+                # non place cells on the ref day (in either set of trials)
+                ids = np.where(np.logical_and(
+                    ~multiDayData[ref_day].place_cell_masks[an]['set 0'],
+                    ~multiDayData[ref_day].place_cell_masks[an]['set 1']
+                ))[0]
+
+            tracked[an][cat][ds_i] = {}
+            tracked[an][cat][ds_i]['orig_id'] = ids
+
+            # --- REF ---
+            # returns index of cell ID in the tracked cell list from the ref day
+            find_in_tracked = ut.lookup_ind_exact(ids,
+                                                  common_rois[an]['common_rois'][ds.index(ref_day), :])
+            # get rid of nans (cells that weren't tracked across this day pair)
+            find_in_tracked = find_in_tracked[~np.isnan(
+                find_in_tracked)].astype(int)
+
+            # get original cell ID of the tracked cells on the ref day
+            ref_id = common_rois[an]['common_rois'][ds.index(
+                ref_day), find_in_tracked]
+
+            # Get data for these cells (reward-relative [circ] firing peaks, spatial [linear] firing peaks)
+            ref_data = get_tracked_data(
+                ref_id, multiDayData, ref_day, an, cat)
+            tracked[an][cat][ds_i]['id_ref'] = ref_id
+            tracked[an][cat][ds_i]['dist_ref'] = ref_data['dist'] # circ distance between relative peaks, radians
+            tracked[an][cat][ds_i]['peaks_ref'] = ref_data['peaks']
+            tracked[an][cat][ds_i]['rel_peaks_ref'] = ref_data['rel_peaks']
+
+            # --- TARGET ---
+            # get cell ID on the target day
+            targ_id = common_rois[an]['common_rois'][ds.index(
+                targ_day), find_in_tracked]
+            # now find the original IDs of the tracked cells on the target day
+            # then get their distances on the target day
+
+            targ_data = get_tracked_data(
+                targ_id, multiDayData, targ_day, an, cat)
+            tracked[an][cat][ds_i]['id_targ'] = targ_data['id']
+            tracked[an][cat][ds_i]['dist_targ'] = targ_data['dist']
+            tracked[an][cat][ds_i]['peaks_targ'] = targ_data['peaks']
+            tracked[an][cat][ds_i]['rel_peaks_targ'] = targ_data['rel_peaks']
+
+            # find abs(delta) between linear peaks on the target day vs. ref day
+            # unsigned linear delta:
+            tracked[an][cat][ds_i]['delta_peaks'] = np.abs(
+                tracked[an][cat][ds_i]['peaks_targ']['set 0'] -
+                tracked[an][cat][ds_i]['peaks_ref']['set 0']
+            )
+
+            # unsigned circular delta:
+            tracked[an][cat][ds_i]['delta_rel_peaks'] = circ.phase_diff(
+                tracked[an][cat][ds_i]['rel_peaks_targ']['set 0'], tracked[an][cat][ds_i]['rel_peaks_ref']['set 0']
+            )
+
+            # signed circular delta
+            tracked[an][cat][ds_i]['signed_delta_rel_peaks'] = circ.wrap(
+                tracked[an][cat][ds_i]['rel_peaks_targ']['set 0'] -
+                tracked[an][cat][ds_i]['rel_peaks_ref']['set 0']
+            )
+
+            # -- track-relative --
+            # find ids of cells in the target day that become track relative
+            tracked[an][cat][ds_i]['ids_becoming_track_targ'] = tracked[an][cat][ds_i]['id_targ'][
+                np.isin(tracked[an][cat][ds_i]['id_targ'],
+                        np.where(
+                            multiDayData[targ_day].cell_class[an]['masks']['track'])[0]
+                        )
+            ].astype(int)
+
+            tmp_find_TR = ut.lookup_ind_exact(tracked[an][cat][ds_i]['ids_becoming_track_targ'],
+                                             tracked[an][cat][ds_i]['id_targ']).astype(int)
+
+            # find the original cell IDs of cells tracked from ref to targ and staying track-relative
+            tracked[an][cat][ds_i]['ids_becoming_track_ref'] = tracked[an][cat][ds_i]['id_ref'][tmp_find_TR]
+            # fraction tracked to the target day that are TR on the target day
+            tracked[an][cat][ds_i]['frac_becoming_track'] = len(tracked[an][cat][ds_i]['ids_becoming_track_targ']
+                                                                ) / np.sum(
+                ~np.isnan(tracked[an][cat][ds_i]['id_targ'])
+            )
+
+            # find fraction of cells in each group that are actually tracked
+            tracked[an][cat][ds_i]['frac_tracked'] = np.sum(
+                ~np.isnan(tracked[an][cat][ds_i]['id_targ'])) / len(tracked[an][cat][ds_i]['id_ref'])
+
+            # -- reward-relative --
+            # find ids of cells in the target day that become/stay reward-relative (RR)
+            # lookup in reward rel cell list from target day so we incorporate xcorr criteria
+            tracked[an][cat][ds_i]['ids_becoming_rr_targ'] = tracked[an][cat][ds_i]['id_targ'][
+                np.isin(tracked[an][cat][ds_i]['id_targ'],
+                        multiDayData[targ_day].reward_rel_cell_ids[an])
+            ].astype(int)
+
+            # if at least 5 cells were tracked, find the fraction of the ref category that became RR
+            if np.sum(~np.isnan(tracked[an][cat][ds_i]['dist_targ'])) >= 5:
+
+                becoming_rr = np.isin(
+                    tracked[an][cat][ds_i]['id_targ'], multiDayData[targ_day].reward_rel_cell_ids[an])
+                if limit_rr_to_and:
+                    tmp_rr_ids = tracked[an][cat][ds_i]['id_targ'][becoming_rr]
+                    becoming_rr = np.isin(tmp_rr_ids, np.where(np.logical_and(
+                        multiDayData[targ_day].place_cell_masks[an]['set 0'],
+                        multiDayData[targ_day].place_cell_masks[an]['set 1']
                     ))[0]
-                    # exclude reward-relative cells
-                    ids = ids[~np.isin(ids, rr_ids
-                                       )]
-                elif cat == 'nontrack_pc':
-                    # find the pcs that are not rr cells AND not track-relative on the ref day
-                    # do this by place cell masks, not "keep" (since that could exclude certain cell types)
-                    ids = np.where(np.logical_or(
-                        multiDayData[ref_day].place_cell_masks[an]['set 0'],
-                        multiDayData[ref_day].place_cell_masks[an]['set 1']
-                    ))[0]
-                    ids = ids[~np.isin(ids, rr_ids
-                                       )]
-                    ids = ids[~np.isin(ids, np.where(
-                        multiDayData[ref_day].cell_class[an]['masks']['track'])[0])]
+                    )
+                    tracked[an][cat][ds_i]['ids_becoming_rr_targ'] = tmp_rr_ids[becoming_rr].astype(
+                        int)
 
-                elif cat in ['track', 'appear', 'disappear']:
-                    # find cells that were track-relative, appearing, or disappearing
-                    ids = np.where(
-                        multiDayData[ref_day].cell_class[an]['masks'][cat])[0]
-                    ids = ids[~np.isin(ids, rr_ids
-                                       )]
-                elif cat == 'nonreward_remap':
-                    # specifically nonreward remapping cells that are not reward-relative
-                    ids = np.where(
-                        multiDayData[ref_day].cell_class[an]['masks'][cat])[0]
-                    # print('frac rr cells out of nonreward_remap:',
-                    #       np.sum(np.isin(
-                    #           rr_ids,
-                    #       ids)) / len(ids)
-                    #      )
-                    ids = ids[~np.isin(ids, rr_ids
-                                       )]
-                elif cat == 'nonpc':
-                    # non place cells on the ref day (in either set of trials)
-                    ids = np.where(np.logical_and(
-                        ~multiDayData[ref_day].place_cell_masks[an]['set 0'],
-                        ~multiDayData[ref_day].place_cell_masks[an]['set 1']
-                    ))[0]
-
-                tracked[an][cat][ds_i] = {}
-                tracked[an][cat][ds_i]['orig_id'] = ids
-
-                # --- REF ---
-                # returns index of cell ID in the tracked cell list from the ref day
-                find_in_tracked = ut.lookup_ind_exact(ids,
-                                                      common_rois[an]['common_rois'][ds.index(ref_day), :])
-                # get rid of nans (cells that weren't tracked across this day pair)
-                find_in_tracked = find_in_tracked[~np.isnan(
-                    find_in_tracked)].astype(int)
-
-                # get original cell ID of the tracked cells on the ref day
-                ref_id = common_rois[an]['common_rois'][ds.index(
-                    ref_day), find_in_tracked]
-
-                # Get data for these cells (reward-relative [circ] firing peaks, spatial [linear] firing peaks)
-                ref_data = get_tracked_data(
-                    ref_id, multiDayData, ref_day, an, cat)
-                tracked[an][cat][ds_i]['id_ref'] = ref_id
-                tracked[an][cat][ds_i]['dist_ref'] = ref_data['dist'] # circ distance between relative peaks, radians
-                tracked[an][cat][ds_i]['peaks_ref'] = ref_data['peaks']
-                tracked[an][cat][ds_i]['rel_peaks_ref'] = ref_data['rel_peaks']
-
-                # --- TARGET ---
-                # get cell ID on the target day
-                targ_id = common_rois[an]['common_rois'][ds.index(
-                    targ_day), find_in_tracked]
-                # now find the original IDs of the tracked cells on the target day
-                # then get their distances on the target day
-
-                targ_data = get_tracked_data(
-                    targ_id, multiDayData, targ_day, an, cat)
-                tracked[an][cat][ds_i]['id_targ'] = targ_data['id']
-                tracked[an][cat][ds_i]['dist_targ'] = targ_data['dist']
-                tracked[an][cat][ds_i]['peaks_targ'] = targ_data['peaks']
-                tracked[an][cat][ds_i]['rel_peaks_targ'] = targ_data['rel_peaks']
-
-                # find abs(delta) between linear peaks on the target day vs. ref day
-                # unsigned linear delta:
-                tracked[an][cat][ds_i]['delta_peaks'] = np.abs(
-                    tracked[an][cat][ds_i]['peaks_targ']['set 0'] -
-                    tracked[an][cat][ds_i]['peaks_ref']['set 0']
-                )
-
-                # unsigned circular delta:
-                tracked[an][cat][ds_i]['delta_rel_peaks'] = circ.phase_diff(
-                    tracked[an][cat][ds_i]['rel_peaks_targ']['set 0'], tracked[an][cat][ds_i]['rel_peaks_ref']['set 0']
-                )
-
-                # signed circular delta
-                tracked[an][cat][ds_i]['signed_delta_rel_peaks'] = circ.wrap(
-                    tracked[an][cat][ds_i]['rel_peaks_targ']['set 0'] -
-                    tracked[an][cat][ds_i]['rel_peaks_ref']['set 0']
-                )
-
-                # -- track-relative --
-                # find ids of cells in the target day that become track relative
-                tracked[an][cat][ds_i]['ids_becoming_track_targ'] = tracked[an][cat][ds_i]['id_targ'][
-                    np.isin(tracked[an][cat][ds_i]['id_targ'],
-                            np.where(
-                                multiDayData[targ_day].cell_class[an]['masks']['track'])[0]
-                            )
-                ].astype(int)
-
-                tmp_find_TR = ut.lookup_ind_exact(tracked[an][cat][ds_i]['ids_becoming_track_targ'],
-                                                 tracked[an][cat][ds_i]['id_targ']).astype(int)
-
-                # find the original cell IDs of cells tracked from ref to targ and staying track-relative
-                tracked[an][cat][ds_i]['ids_becoming_track_ref'] = tracked[an][cat][ds_i]['id_ref'][tmp_find_TR]
-                # fraction tracked to the target day that are TR on the target day
-                tracked[an][cat][ds_i]['frac_becoming_track'] = len(tracked[an][cat][ds_i]['ids_becoming_track_targ']
-                                                                    ) / np.sum(
+                # fraction tracked to the target day that are RR on the target day
+                tracked[an][cat][ds_i]['frac_becoming_rr'] = np.sum(becoming_rr) / np.sum(
                     ~np.isnan(tracked[an][cat][ds_i]['id_targ'])
                 )
 
-                # find fraction of cells in each group that are actually tracked
-                tracked[an][cat][ds_i]['frac_tracked'] = np.sum(
-                    ~np.isnan(tracked[an][cat][ds_i]['id_targ'])) / len(tracked[an][cat][ds_i]['id_ref'])
+            else:
+                tracked[an][cat][ds_i]['frac_becoming_rr'] = np.nan
 
-                # -- reward-relative --
-                # find ids of cells in the target day that become/stay reward-relative (RR)
-                # lookup in reward rel cell list from target day so we incorporate xcorr criteria
-                tracked[an][cat][ds_i]['ids_becoming_rr_targ'] = tracked[an][cat][ds_i]['id_targ'][
-                    np.isin(tracked[an][cat][ds_i]['id_targ'],
-                            multiDayData[targ_day].reward_rel_cell_ids[an])
-                ].astype(int)
+            # find the original cell IDs of cells tracked from ref to targ and staying RR
+            tmp_find_RR = ut.lookup_ind_exact(tracked[an][cat][ds_i]['ids_becoming_rr_targ'],
+                                           tracked[an][cat][ds_i]['id_targ']).astype(int)
 
-                # if at least 5 cells were tracked, find the fraction of the ref category that became RR
-                if np.sum(~np.isnan(tracked[an][cat][ds_i]['dist_targ'])) >= 5:
-       
-                    becoming_rr = np.isin(
-                        tracked[an][cat][ds_i]['id_targ'], multiDayData[targ_day].reward_rel_cell_ids[an])
-                    if limit_rr_to_and:
-                        tmp_rr_ids = tracked[an][cat][ds_i]['id_targ'][becoming_rr]
-                        becoming_rr = np.isin(tmp_rr_ids, np.where(np.logical_and(
-                            multiDayData[targ_day].place_cell_masks[an]['set 0'],
-                            multiDayData[targ_day].place_cell_masks[an]['set 1']
-                        ))[0]
-                        )
-                        tracked[an][cat][ds_i]['ids_becoming_rr_targ'] = tmp_rr_ids[becoming_rr].astype(
-                            int)
-                    
-                    # fraction tracked to the target day that are RR on the target day
-                    tracked[an][cat][ds_i]['frac_becoming_rr'] = np.sum(becoming_rr) / np.sum(
-                        ~np.isnan(tracked[an][cat][ds_i]['id_targ'])
-                    )
+            tracked[an][cat][ds_i]['ids_becoming_rr_ref'] = tracked[an][cat][ds_i]['id_ref'][tmp_find_RR].astype(
+                int)
 
-                else:
-                    tracked[an][cat][ds_i]['frac_becoming_rr'] = np.nan
+
+            if cat == 'rr':
+                # of the cells that stay rr, do they keep their dist to reward?
+                # use the dist to reward before the switch for this (more stable)
 
                 # find the original cell IDs of cells tracked from ref to targ and staying RR
-                tmp_find_RR = ut.lookup_ind_exact(tracked[an][cat][ds_i]['ids_becoming_rr_targ'],
-                                               tracked[an][cat][ds_i]['id_targ']).astype(int)
+                orig_ref_id = tracked[an][cat][ds_i]['ids_becoming_rr_ref']
+                orig_targ_id = tracked[an][cat][ds_i]['ids_becoming_rr_targ']
 
-                tracked[an][cat][ds_i]['ids_becoming_rr_ref'] = tracked[an][cat][ds_i]['id_ref'][tmp_find_RR].astype(
-                    int)
+                in_rr_ref = np.isin(
+                    np.where(multiDayData[ref_day].overall_place_cell_masks[an])[0], orig_ref_id)
+                in_rr_targ = np.isin(
+                    np.where(multiDayData[targ_day].overall_place_cell_masks[an])[0], orig_targ_id)
 
+                # just take the relative dist in the before sequence:
+                tracked[an][cat][ds_i]['dist_to_rew_ref'] = multiDayData[ref_day].rel_peaks[an]['set 0'][in_rr_ref]
+                tracked[an][cat][ds_i]['dist_to_rew_targ'] = multiDayData[targ_day].rel_peaks[an]['set 0'][in_rr_targ]
 
-                if cat == 'rr':
-                    # of the cells that stay rr, do they keep their dist to reward?
-                    # use the dist to reward before the switch for this (more stable)
+        # Collect all the data
+        tracked[an]['day_combo'][ds_i, :] = ds
+        tracked[an]['n_tracked'][ds_i] = common_rois[an]['common_rois'].shape[1]
+        tracked[an]['n_ref'][ds_i] = common_rois[an]['n_cells'].astype(
+            int)
+        tracked[an]['frac_tracked'][ds_i] = tracked[an]['n_tracked'][ds_i] / \
+            tracked[an]['n_ref'][ds_i]
 
-                    # find the original cell IDs of cells tracked from ref to targ and staying RR
-                    orig_ref_id = tracked[an][cat][ds_i]['ids_becoming_rr_ref']
-                    orig_targ_id = tracked[an][cat][ds_i]['ids_becoming_rr_targ']
+        df_this_combo = pd.DataFrame({'mouse': an, 'combo_len': n, 'day_combo_i': ds_i, 'day_combo': [ds],
+                                      'n_tracked': common_rois[an]['common_rois'].shape[1],
+                                      'n_ref': common_rois[an]['n_cells'].astype(int),
+                                      'frac_tracked': tracked[an]['frac_tracked'][ds_i],
+                                      })
 
-                    in_rr_ref = np.isin(
-                        np.where(multiDayData[ref_day].overall_place_cell_masks[an])[0], orig_ref_id)
-                    in_rr_targ = np.isin(
-                        np.where(multiDayData[targ_day].overall_place_cell_masks[an])[0], orig_targ_id)
+        for cat in cats:
+            df_this_combo[f'frac_{cat}_becoming_rr'] = tracked[an][cat][ds_i]['frac_becoming_rr']
+            df_this_combo[f'frac_{cat}_tracked'] = tracked[an][cat][ds_i]['frac_tracked']
+            df_this_combo[f'frac_{cat}_becoming_track'] = tracked[an][cat][ds_i]['frac_becoming_track']
 
-                    # just take the relative dist in the before sequence:
-                    tracked[an][cat][ds_i]['dist_to_rew_ref'] = multiDayData[ref_day].rel_peaks[an]['set 0'][in_rr_ref]
-                    tracked[an][cat][ds_i]['dist_to_rew_targ'] = multiDayData[targ_day].rel_peaks[an]['set 0'][in_rr_targ]
-
-            # Collect all the data
-            tracked[an]['day_combo'][ds_i, :] = ds
-            tracked[an]['n_tracked'][ds_i] = common_rois[an]['common_rois'].shape[1]
-            tracked[an]['n_ref'][ds_i] = common_rois[an]['n_cells'].astype(
-                int)
-            tracked[an]['frac_tracked'][ds_i] = tracked[an]['n_tracked'][ds_i] / \
-                tracked[an]['n_ref'][ds_i]
-
-            df_this_combo = pd.DataFrame({'mouse': an, 'combo_len': n, 'day_combo_i': ds_i, 'day_combo': [ds],
-                                          'n_tracked': common_rois[an]['common_rois'].shape[1],
-                                          'n_ref': common_rois[an]['n_cells'].astype(int),
-                                          'frac_tracked': tracked[an]['frac_tracked'][ds_i],
-                                          })
-
-            for cat in cats:
-                df_this_combo[f'frac_{cat}_becoming_rr'] = tracked[an][cat][ds_i]['frac_becoming_rr']
-                df_this_combo[f'frac_{cat}_tracked'] = tracked[an][cat][ds_i]['frac_tracked']
-                df_this_combo[f'frac_{cat}_becoming_track'] = tracked[an][cat][ds_i]['frac_becoming_track']
-
-            df = df.append(df_this_combo, ignore_index=True)
+        df = df.append(df_this_combo, ignore_index=True)
 ```
 
 ### Plot tracked cell types with ROIs
@@ -686,7 +683,8 @@ rel_pos_bin_centers = rel_pos_bins[:-1] + \
 
 rel_pos_bin_centers = spatial.dist_rad_to_cm(rel_pos_bin_centers)
 
-# rel peaks are circular, just "peaks" are linear
+# "rel peaks" are circular, "peaks" are linear
+rel_peaks_ref = dict([(cat, {}) for cat in cat_to_plot])
 delta_rel_peaks = dict([(cat, {}) for cat in cat_to_plot])
 signed_delta_rel_peaks = dict([(cat, {}) for cat in cat_to_plot])
 delta_peaks = dict([(cat, {}) for cat in cat_to_plot])
@@ -698,6 +696,7 @@ fig, ax = plt.subplots(2, len(cat_to_plot), figsize=[12, 6], sharey=True)
 for cat_i, cat in enumerate(cat_to_plot):
     for ds_i, ds in enumerate(day_slices):
 
+        rel_peaks_ref[cat][ds_i] = np.array([])
         delta_rel_peaks[cat][ds_i] = np.array([])
         signed_delta_rel_peaks[cat][ds_i] = np.array([])
 
@@ -712,6 +711,8 @@ for cat_i, cat in enumerate(cat_to_plot):
             an_cell_id[cat][ds_i][:, 1] = tracked[an][cat][ds_i]['id_ref']
             an_cell_id[cat][ds_i][:, 2] = tracked[an][cat][ds_i]['id_targ']
 
+            rel_peaks_ref[cat][ds_i] = np.append(
+                rel_peaks_ref[cat][ds_i], tracked[an][cat][ds_i]['rel_peaks_ref']['set 0'])
             delta_rel_peaks[cat][ds_i] = np.append(
                 delta_rel_peaks[cat][ds_i], tracked[an][cat][ds_i]['delta_rel_peaks'])
             signed_delta_rel_peaks[cat][ds_i] = np.append(
@@ -831,7 +832,6 @@ ax[0, cat_i].set_xlabel('pos. rel to reward pre-switch, ref day (cm)')
 
 save_figures = False
 if save_figures:
-    # -rr-restrict-to-and
     pt.savefig(fig, fig_dir, "%s_expday%s_CrossDayInstability-by-relPos_%s_%s_%s" % (
         ut.make_anim_tag(use_ans), ut.make_day_tag(exp_days), circ_tag, ts_key, place_cell_logical)
     )
@@ -1050,6 +1050,8 @@ for ds_i, ds in enumerate(day_slices):
 
             id_ref = id_ref[~np.isnan(id_targ)].astype(int)
             id_targ = id_targ[~np.isnan(id_targ)].astype(int)
+            
+            # require at least 5 tracked cells to compute a "sequence"
             if len(id_targ) >= 5:
 
                 # normalize each cell's firing rate by the mean FR on the ref day
