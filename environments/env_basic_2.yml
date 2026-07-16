@@ -1,0 +1,29 @@
+name: env_basic
+channels:
+  - defaults
+  - anaconda
+  - conda-forge
+
+dependencies:
+  - python=3.8.5
+  - astropy=4.0.2
+  - dill=0.3.3
+  - h5py=2.10.0
+  - jupyter
+  - jupyterlab
+  - matplotlib=3.7.4
+  - numba=0.51.2
+  - numpy>=1.19
+  - pandas=1.1.3
+  - pingouin=0.5.0
+  - pip
+  - scikit-learn=1.0.2
+  - scipy=1.7.3
+  - seaborn=0.12.2
+  - sqlite
+  - statsmodels>=0.12
+  - tensorflow=2.13
+  - keras=2.13.1
+  - uncertainties
+#  - pip:
+
