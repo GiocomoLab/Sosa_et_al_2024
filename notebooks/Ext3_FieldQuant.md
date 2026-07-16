@@ -558,6 +558,10 @@ for day in exp_days:
 To-do: make this run more efficiently.
 
 ```python
+super_field_dict[day][an]['field_dict']['set 0'].keys()
+```
+
+```python
 # 2d histogram of how many cells have how many fields ( and collect widths and COM)
 # allows for max 4 fields and I never observe more than this for cells with sig fields
 num_bins = np.arange(1, 7, 1)-0.5
@@ -580,7 +584,9 @@ multi_field_formation_lap = dict([(ct, {}) for ct in ct_keys])
 mean_FR = dict([(ct, {}) for ct in ct_keys])
 single_field_FR = dict([(ct, {}) for ct in ct_keys])
 
-single_field_diff_df = pd.DataFrame(columns=['day', 'ct', 'width', 'field_FR'])
+single_field_diff_df = pd.DataFrame(columns=['day', 'ct', 'width_diff', 'field_FR',
+                                            'width_set0','width_set1','field_FR_set0','field_FR_set1',
+                                            'abs_COM_set0','abs_COM_set1'])
 all_field_diff_df = pd.DataFrame(
     columns=['day', 'ct', 'field_count_diff', 'mean_FR'])
 corr_df = pd.DataFrame(
@@ -597,6 +603,9 @@ for ct_i, ct in enumerate(ct_keys):
             2.5*len(exp_days), 5])
         fig_fr, ax_fr = plt.subplots(2, len(exp_days), figsize=[
             2.5*len(exp_days), 5])
+        fig_wfr, ax_wfr = plt.subplots(3, len(exp_days), figsize=[
+                                   2.5*len(exp_days), 7.5])
+       
         [ax_w[0, i].plot([0, 300], [0, 300], '--', color='grey')
          for i in range(ax_w.shape[1])]
         [ax_w[1, i].plot([0, 4], [1, 1], ':', color='grey')
@@ -765,15 +774,16 @@ for ct_i, ct in enumerate(ct_keys):
                 else:
                     use_COM = 'COM'
 
+                ## Nov 2025: limited to same fields as field width
                 single_field_COM[ct][day]['set 0'].append([
                     super_field_dict[day][an]['field_dict']['set 0'][use_COM][cell].squeeze(
                     )
-                    for cell in orig_cells[(find_single_field & find_this_ct)]]
+                    for cell in orig_cells[(find_single_field & find_this_ct_w)]] #was: find_this_ct
                 )
                 single_field_COM[ct][day]['set 1'].append([
                     super_field_dict[day][an]['field_dict']['set 1'][use_COM][cell].squeeze(
                     )
-                    for cell in orig_cells[(find_single_field & find_this_ct)]]
+                    for cell in orig_cells[(find_single_field & find_this_ct_w)]]
                 )
 
                 # get field offset in circular coords for cells with exactly 2 fields before and after
@@ -940,14 +950,29 @@ for ct_i, ct in enumerate(ct_keys):
             n_entries = len(single_field_widths[ct][day]['width_diff'])
             day_arr = np.repeat(day, n_entries)
             ct_arr = np.repeat(ct, n_entries)
+            if ct == 'RR':
+                tmp_COM_0 = spatial.dist_rad_to_cm(single_field_COM[ct][day]['set 0'])
+                tmp_COM_1 = spatial.dist_rad_to_cm(single_field_COM[ct][day]['set 1'])
+            else:
+                tmp_COM_0 = single_field_COM[ct][day]['set 0']
+                tmp_COM_1 = single_field_COM[ct][day]['set 1']
+                
             df_this_day = pd.DataFrame({
                 'day': day_arr,
                 'ct': ct_arr,
-                'width': single_field_widths[ct][day]['width_diff'],
-                'field_FR': (
+                'width_diff': single_field_widths[ct][day]['width_diff'],
+                'field_FR':
                     single_field_FR[ct][day]['set 1'] -
                     single_field_FR[ct][day]['set 0']
-                ), }
+                , 
+                'width_set0': single_field_widths[ct][day]['set 0'],
+                'width_set1': single_field_widths[ct][day]['set 1'],
+                'field_FR_set0': single_field_FR[ct][day]['set 0'],
+                'field_FR_set1': single_field_FR[ct][day]['set 1'],
+                'abs_COM_set0': tmp_COM_0,
+                'abs_COM_set1': tmp_COM_1,
+                
+            }
             )
             single_field_diff_df = single_field_diff_df.append(df_this_day,
                                                                ignore_index=True)
@@ -1130,6 +1155,64 @@ for ct_i, ct in enumerate(ct_keys):
             ax_fr[1, d_i].set_title('2sided W=%.2f, p=%.2e' % (mean_fr_st.statistic,
                                                                mean_fr_st.pvalue),
                                     fontsize=10)
+            
+            #### Nov 2025 additions
+             # correlation of field width with in-field firing rate
+            width_FR_corr = sp.stats.pearsonr(single_field_widths[ct][day]['set 0'],
+                                                 single_field_FR[ct][day]['set 0']
+                                                 )
+
+            ax_wfr[0, d_i].scatter(single_field_widths[ct][day]['set 0'],
+                                 single_field_FR[ct][day]['set 0'],
+                                 color=ct_colors[ct_i],
+                                 alpha=0.5,
+                                 s=10)
+            # ax_wfr[1, d_i].axis('square')
+            ax_wfr[0, d_i].set_xlabel('field width')
+            ax_wfr[0, d_i].set_ylabel('mean in-field FR')
+
+            ax_wfr[0, d_i].set_title('r=%.2f, p=%.2e' % (
+                width_FR_corr[0],
+                width_FR_corr[1]),
+                fontsize=10)
+            
+            # unsigned field COM vs. field width
+            if ct == 'RR':
+                tmp_COM = spatial.dist_rad_to_cm(single_field_COM[ct][day]['set 0'])
+                # ax_wfr[2, d_i].set_xticks([0, 1, 2, 3])
+            else:
+                tmp_COM = single_field_COM[ct][day]['set 0']
+                
+            ax_wfr[1, d_i].scatter(tmp_COM,
+                                   single_field_widths[ct][day]['set 0'],
+                                   color=ct_colors[ct_i],
+                                   alpha=0.5,
+                                   s=10)
+            # if ct == 'RR':
+            #     ax_wfr[1, d_i].set_xticks([0, 1, 2, 3])
+                # ax_wfr[1, d_i].set_yticks([-3, -2, -1, 0, 1, 2, 3])
+            # ax_wfr[1, d_i].axis('square')
+            ax_wfr[1, d_i].set_xlabel('1 field COM before')
+            ax_wfr[1, d_i].set_ylabel('field width')
+            # ax_wfr[1, d_i].set_title('n=%d cells, %d an' % (single_field_COM[ct][day]['n_cells'],
+            #                                                 single_field_COM[ct][day]['n_anim']
+            #                                                 ))
+            
+            # unsigned field COM vs. in-field FR                         
+            ax_wfr[2, d_i].scatter(tmp_COM,
+                                   single_field_FR[ct][day]['set 0'],
+                                   color=ct_colors[ct_i],
+                                   alpha=0.5,
+                                   s=10)
+#             if ct == 'RR':
+                
+                # ax_wfr[2, d_i].set_yticks([-3, -2, -1, 0, 1, 2, 3])
+            # ax_wfr[2, d_i].axis('square')
+            ax_wfr[2, d_i].set_xlabel('1 field COM before')
+            ax_wfr[2, d_i].set_ylabel('in-field FR')
+            # ax_wfr[1, d_i].set_title('n=%d cells, %d an' % (single_field_COM[ct][day]['n_cells'],
+            #                                                 single_field_COM[ct][day]['n_anim']
+            #                                                 ))
 
     save_figures = False
     if ct != 'appear':
@@ -1154,7 +1237,7 @@ for ct_i, ct in enumerate(ct_keys):
 ```
 
 ```python
-single_field_diff_df
+spatial.dist_rad_to_cm(single_field_COM['RR'][day]['set 0']), single_field_COM['RR'][day]['set 0']
 ```
 
 ```python
@@ -1174,6 +1257,10 @@ print('TR', single_field_diff_df.loc[
 
 ```python
 import pingouin
+```
+
+```python
+single_field_diff_df
 ```
 
 ```python
@@ -1254,6 +1341,105 @@ if save_figures:
 
 ```python
 # ut.write_source_csv(df_single_frac, "Ext3d")
+```
+
+```python
+# all days: rrpos vs field width
+fig, ax = plt.subplots(2,3, figsize=(9,6))
+
+
+for ct_i, ct in enumerate(['RR','TR','nonRR']):
+    
+    
+    ax[0, ct_i].scatter(single_field_diff_df.loc[single_field_diff_df['ct']==ct, 
+                                                         'abs_COM_set0'],
+                        single_field_diff_df.loc[single_field_diff_df['ct']==ct, 
+                                                         'width_set0'],
+                        
+                       color=ct_colors[ct_i],
+                       alpha=0.5,
+                       s=10)
+    if ct == 'RR':
+        ax[0, ct_i].set_yticks([0, 1, 2, 3])
+        # ax_wfr[2, d_i].set_yticks([-3, -2, -1, 0, 1, 2, 3])
+    # ax_wfr[2, d_i].axis('square')
+    ax[0, ct_i].set_xlabel('field COM before')
+    ax[0, ct_i].set_ylabel('field width')
+    
+    # cl_rho, cl_pval, slope, phi, _ = ppcore.cl_corr(single_field_diff_df.loc[single_field_diff_df['ct']==ct, 
+    #                                                      'width_set0'],
+    #                     single_field_diff_df.loc[single_field_diff_df['ct']==ct, 
+    #                                                      'abs_COM_set0'],
+    #                                                 0,
+    #                                                 1,
+    #                                                return_pval=True)
+    slope, intercept, line, reg_params = regression.linear_reg(
+        single_field_diff_df.loc[single_field_diff_df['ct']==ct, 
+                                                         'abs_COM_set0'],
+        single_field_diff_df.loc[single_field_diff_df['ct']==ct, 
+                                                         'width_set0']
+    )
+
+    h = pt.plot_mean_sem(ax[0, ct_i],line['y'],line['std'],xvalues=line['x'],
+                     color='grey',
+            label=('r2=%.2f, \n p=%.2e' % (reg_params['r2'],
+                                        reg_params['p'])))
+
+    # h = pt.plot_mean_sem(ax[ct_i],line['y'],line['std'],xvalues=line['x'],
+    #                  color='grey',
+    #         label=('r2=%.2f, \n p=%.2e' % (reg_params['r2'],
+    #                                     reg_params['p'])))
+    #\n rho=%.2f, \n p=%.2e
+    ax[0, ct_i].legend()
+    ax[0,ct_i].set_title('%s, n=%d cells \n rho=%.2f, \n p=%.2e' % (ct,
+                                            len(single_field_diff_df.loc[single_field_diff_df['ct']==ct]),
+                                                                   reg_params['r'],
+                                                                   reg_params['p'])
+                                                                 )
+    
+    ax[1, ct_i].scatter(single_field_diff_df.loc[single_field_diff_df['ct']==ct, 
+                                                         'abs_COM_set0'],
+                        single_field_diff_df.loc[single_field_diff_df['ct']==ct, 
+                                                         'field_FR_set0'],
+                       color=ct_colors[ct_i],
+                       alpha=0.5,
+                       s=10)
+    # if ct == 'RR':
+        # ax[1, ct_i].set_yticks([0, 1, 2, 3])
+        # ax_wfr[2, d_i].set_yticks([-3, -2, -1, 0, 1, 2, 3])
+    # ax_wfr[2, d_i].axis('square')
+    ax[1, ct_i].set_xlabel('field COM before')
+    ax[1, ct_i].set_ylabel('field FR')
+    
+    slope, intercept, line, reg_params = regression.linear_reg(
+        single_field_diff_df.loc[single_field_diff_df['ct']==ct, 
+                                                         'abs_COM_set0'],
+        single_field_diff_df.loc[single_field_diff_df['ct']==ct, 
+                                                         'field_FR_set0'],
+    )
+    # cl_rho, cl_pval, slope, phi, _ = ppcore.cl_corr(single_field_diff_df.loc[single_field_diff_df['ct']==ct, 
+    #                                                      'field_FR_set0'],
+    #                     single_field_diff_df.loc[single_field_diff_df['ct']==ct, 
+    #                                                      'abs_COM_set0'],
+    #                                                 0,
+    #                                                 1,
+    #                                                return_pval=True)
+
+    h = pt.plot_mean_sem(ax[1,ct_i],line['y'],line['std'],xvalues=line['x'],
+                     color='grey',
+            label=('r2=%.2f, \n p=%.2e' % (reg_params['r2'],
+                                        reg_params['p'])))
+    
+    ax[1,ct_i].set_title('%s, n=%d cells, \n rho=%.2f, \n p=%.2e' % (ct,
+                                                                   len(single_field_diff_df.loc[single_field_diff_df['ct']==ct]),
+                                                                   reg_params['r'],
+                                                                   reg_params['p']))
+    
+
+# [ax[i].set_ylim([0.2,0.6]) for i in range(len(ax))];
+# [ax[i].set_xticks(np.arange(len(exp_days))+1) for i in range(len(ax))];
+# ax[0].set_ylabel('fraction of cells \n maintaining single field')
+# ax[1].set_xlabel('switch')
 ```
 
 ### Plot some examples place fields
